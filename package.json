@@ -1,0 +1,10 @@
+{
+  "name": "combo-htmx",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm --filter @combo/design-system build && pnpm --filter @combo/app dev",
+    "typecheck": "pnpm -r typecheck"
+  }
+}

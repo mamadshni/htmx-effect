@@ -1,0 +1,23 @@
+{
+  "name": "@combo/app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.tsx",
+    "start": "tsx src/main.tsx",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@combo/design-system": "workspace:*",
+    "@effect/platform-node": "4.0.1",
+    "effect": "4.0.1",
+    "htmx.org": "^2.0.11",
+    "tsx-to-html": "^0.0.31"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.3"
+  }
+}
