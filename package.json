@@ -3,8 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm -r build",
     "dev": "pnpm --filter @combo/design-system build && pnpm --filter @combo/app dev",
-    "typecheck": "pnpm -r typecheck"
-  }
+    "build": "pnpm -r run build",
+    "typecheck": "pnpm -r run build:types && pnpm -r run typecheck",
+    "clean": "pnpm -r run clean && rm -rf node_modules apps/*/node_modules packages/*/node_modules"
+  },
+  "packageManager": "pnpm@11.20.0"
 }

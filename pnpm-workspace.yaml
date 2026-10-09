@@ -2,8 +2,11 @@ packages:
   - apps/*
   - packages/*
 
+# esbuild ships its binary as an optional dependency; its install script is not needed
 allowBuilds:
   esbuild: false
 
-onlyBuiltDependencies:
-  - esbuild
+peerDependencyRules:
+  allowedVersions:
+    # tsx-to-html declares typescript ^5 but works with 6
+    tsx-to-html>typescript: "6"

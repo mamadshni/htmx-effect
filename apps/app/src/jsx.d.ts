@@ -1,17 +1,19 @@
+import type { DsCombobox } from "@combo/design-system/bundle/index.js";
+
 declare global {
   namespace JSX {
+    // Invoker Commands API (not in lib.dom yet)
     interface GlobalAttributes {
-      "hx-get": string;
-      "hx-target": string;
-      "hx-trigger": string;
-      "hx-include": string;
-      "hx-swap": string;
-      "hx-on--load": string;
+      command: "show-modal" | "close" | "request-close" | `--${string}`;
+      commandfor: string;
     }
+
     interface IntrinsicElements {
-      "ds-search": JSX.Attributes<HTMLElement> & { name?: string };
+      // only HTML attributes: the class getters/methods (input, listbox, sync) are not attributes
+      "ds-combobox": JSX.Attributes<HTMLElement> & { children?: JSX.Node };
     }
   }
 }
 
-export {};
+// keep the import: it loads the design system's global types (DsCombobox, HTMLElementTagNameMap)
+export type { DsCombobox };

@@ -5,7 +5,7 @@ import { NodeHttpServer, NodeRuntime } from "@effect/platform-node";
 import { Effect, Layer } from "effect";
 import { HttpRouter, HttpServerResponse, HttpStaticServer } from "effect/http";
 import { toHtml } from "tsx-to-html";
-import { Page, SearchDialog, SearchOptions } from "./views.js";
+import { Page, SearchOptions } from "./views.js";
 
 const require = createRequire(import.meta.url);
 
@@ -30,12 +30,9 @@ const Routes = Layer.mergeAll(
   HttpRouter.add(
     "GET",
     "/",
-    HttpServerResponse.html(`<!doctype html>${toHtml(<Page />)}`),
-  ),
-  HttpRouter.add(
-    "GET",
-    "/search-dialog",
-    HttpServerResponse.html(toHtml(<SearchDialog items={startingItems} />)),
+    HttpServerResponse.html(
+      `<!doctype html>${toHtml(<Page items={startingItems} />)}`,
+    ),
   ),
   HttpRouter.add("GET", "/search-options", (request) =>
     Effect.sync(() => {
@@ -45,7 +42,10 @@ const Routes = Layer.mergeAll(
       const items = q
         ? fruits.filter((f) => f.toLowerCase().includes(q))
         : startingItems;
-      return HttpServerResponse.html(toHtml(<SearchOptions items={items} />));
+      const selected = items.find((f) => f.toLowerCase() === q);
+      return HttpServerResponse.html(
+        toHtml(<SearchOptions items={items} selected={selected} />),
+      );
     }),
   ),
   HttpRouter.add(
@@ -54,7 +54,7 @@ const Routes = Layer.mergeAll(
     HttpServerResponse.file(require.resolve("htmx.org/dist/htmx.min.js")),
   ),
   HttpStaticServer.layer({
-    root: dirname(require.resolve("@combo/design-system")),
+    root: dirname(require.resolve("@combo/design-system/bundle/index.js")),
     prefix: "/assets/design-system",
     cacheControl: "no-cache",
   }),

@@ -1,0 +1,15 @@
+{
+  // Shared base for the packages; not a project itself (`tsc` at the root compiles nothing).
+  "files": [],
+  "compilerOptions": {
+    "target": "es2022",
+    "moduleDetection": "force",
+    "verbatimModuleSyntax": true,
+    "noUncheckedSideEffectImports": true,
+    "skipLibCheck": true,
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true
+  }
+}

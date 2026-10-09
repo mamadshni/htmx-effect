@@ -1,0 +1,43 @@
+/* one anchor name per combobox, so several on a page do not clash */
+ds-combobox {
+  display: block;
+  anchor-scope: --ds-combobox;
+}
+ds-combobox input[role="combobox"] {
+  anchor-name: --ds-combobox;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.5rem;
+  font: inherit;
+}
+ds-combobox [role="listbox"] {
+  position-anchor: --ds-combobox;
+  inset: auto;
+  top: anchor(bottom);
+  left: anchor(left);
+  width: anchor-size(width);
+  position-try-fallbacks: flip-block;
+  box-sizing: border-box;
+  max-height: 15rem;
+  overflow-y: auto;
+  margin: 0.25rem 0;
+  padding: 0;
+  list-style: none;
+  background: Canvas;
+  color: CanvasText;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+ds-combobox [role="option"] {
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+}
+ds-combobox [role="option"]:not([aria-disabled="true"]):hover { background: #f2f2f2; }
+ds-combobox [role="option"][aria-disabled="true"] {
+  color: GrayText;
+  cursor: default;
+}
+ds-combobox [role="option"][aria-selected="true"] {
+  background: #2563eb;
+  color: #fff;
+}

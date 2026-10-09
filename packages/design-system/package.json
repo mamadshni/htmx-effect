@@ -4,16 +4,20 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    }
+    "./*": "./*"
   },
+  "files": [
+    "./bundle"
+  ],
   "scripts": {
-    "build": "tsc",
+    "clean": "rm -rf bundle",
+    "build": "pnpm run clean && pnpm run build:bundle && pnpm run build:types",
+    "build:bundle": "esbuild src/index.ts src/index.css --bundle --format=iife --target=es2022 --sourcemap --outdir=bundle",
+    "build:types": "tsc",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "esbuild": "^0.28.2",
+    "typescript": "^6.0.3"
   }
 }

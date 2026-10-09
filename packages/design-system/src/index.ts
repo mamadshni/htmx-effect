@@ -1,1 +1,3 @@
-export { DsSearch } from "./search.js";
+import "./combobox.js";
+
+export type { DsCombobox } from "./combobox.js";
