@@ -110,8 +110,8 @@ export const parseWeekdays = (text: string) =>
   );
 
 /** 0 = Sunday … 6 = Saturday, from the locale when the browser knows it (Monday otherwise) */
-export const localeFirstDayOfWeek = (locale: string | undefined) => {
-  const info = new Intl.Locale(locale ?? navigator.language) as Intl.Locale & {
+export const localeFirstDayOfWeek = (locale: string) => {
+  const info = new Intl.Locale(locale) as Intl.Locale & {
     getWeekInfo?: () => { firstDay: number };
     weekInfo?: { firstDay: number };
   };
@@ -121,8 +121,8 @@ export const localeFirstDayOfWeek = (locale: string | undefined) => {
 
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
-const formatter = (locale: string | undefined, options: Intl.DateTimeFormatOptions) => {
-  const key = `${locale ?? ""}|${JSON.stringify(options)}`;
+const formatter = (locale: string, options: Intl.DateTimeFormatOptions) => {
+  const key = `${locale}|${JSON.stringify(options)}`;
   let cached = formatters.get(key);
   if (!cached) {
     cached = new Intl.DateTimeFormat(locale, { ...options, timeZone: "UTC" });
@@ -134,12 +134,12 @@ const formatter = (locale: string | undefined, options: Intl.DateTimeFormatOptio
 export const format = (
   iso: IsoDate,
   options: Intl.DateTimeFormatOptions,
-  locale: string | undefined,
+  locale: string,
 ) => formatter(locale, options).format(parseIso(iso));
 
 export const formatRange = (
   start: IsoDate,
   end: IsoDate,
   options: Intl.DateTimeFormatOptions,
-  locale: string | undefined,
+  locale: string,
 ) => formatter(locale, options).formatRange(parseIso(start)!, parseIso(end)!);

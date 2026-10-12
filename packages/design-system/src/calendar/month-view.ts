@@ -14,8 +14,14 @@ import { CalendarView, type ViewContext } from "./view.js";
 export class MonthView extends CalendarView {
   readonly name = "month";
   readonly columns = 3;
-  readonly previousLabel = "Previous year";
-  readonly nextLabel = "Next year";
+
+  previousLabel({ messages }: ViewContext) {
+    return messages.previousYear;
+  }
+
+  nextLabel({ messages }: ViewContext) {
+    return messages.nextYear;
+  }
 
   heading(page: IsoDate) {
     return String(partsOf(page).year);

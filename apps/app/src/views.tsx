@@ -34,6 +34,12 @@ export const Page = ({ items }: { items: ReadonlyArray<string> }) => (
         <Section id="calendar" title="Calendar">
           <ds-calendar selection="multiple" disallowed-weekdays="0 6" />
         </Section>
+
+        <Section id="german" title="Zeitraum (Deutsch)" lang="de">
+          <Field id="aufenthalt" label="Aufenthalt">
+            <ds-date-picker id="aufenthalt" name="aufenthalt" range months={2} required />
+          </Field>
+        </Section>
       </main>
 
       <SearchDialog items={items} />
@@ -41,8 +47,18 @@ export const Page = ({ items }: { items: ReadonlyArray<string> }) => (
   </html>
 );
 
-const Section = ({ id, title, children }: { id: string; title: string; children?: JSX.Node }) => (
-  <section class="card" aria-labelledby={`${id}-title`}>
+const Section = ({
+  id,
+  title,
+  lang,
+  children,
+}: {
+  id: string;
+  title: string;
+  lang?: string;
+  children?: JSX.Node;
+}) => (
+  <section class="card" lang={lang} aria-labelledby={`${id}-title`}>
     <h2 id={`${id}-title`} class="card__title">
       {title}
     </h2>

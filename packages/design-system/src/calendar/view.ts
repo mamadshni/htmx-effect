@@ -1,3 +1,4 @@
+import type { Messages } from "../messages.js";
 import type { IsoDate } from "./date.js";
 import type { SelectionState } from "./selection.js";
 
@@ -10,7 +11,8 @@ export interface ViewContext {
   readonly min: IsoDate | null;
   readonly max: IsoDate | null;
   readonly today: IsoDate;
-  readonly locale: string | undefined;
+  readonly locale: string;
+  readonly messages: Messages;
   /** 0 = Sunday … 6 = Saturday */
   readonly firstDayOfWeek: number;
   /** months shown side by side (day view) */
@@ -47,8 +49,8 @@ export interface Cell {
 export abstract class CalendarView {
   abstract readonly name: ViewName;
   abstract readonly columns: number;
-  abstract readonly previousLabel: string;
-  abstract readonly nextLabel: string;
+  abstract previousLabel(context: ViewContext): string;
+  abstract nextLabel(context: ViewContext): string;
 
   abstract heading(page: IsoDate, context: ViewContext): string;
 

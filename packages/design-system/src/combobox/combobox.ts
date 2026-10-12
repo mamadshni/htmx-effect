@@ -23,6 +23,9 @@
 import { define, listenOn } from "../shared.js";
 
 namespace Module {
+  export const tagName = "ds-combobox" as const;
+
+  /** no inputs: the server renders the content; this element only adds behaviour */
   export class Combobox extends HTMLElement {
     #listeners?: AbortController;
     // the listbox (or its options) may be replaced from outside; re-derive state when it is.
@@ -190,7 +193,7 @@ namespace Module {
   }
 }
 
-define("ds-combobox", Module.Combobox);
+define(Module.tagName, Module.Combobox);
 
 globalThis.DsCombobox = Module.Combobox;
 
@@ -201,6 +204,6 @@ declare global {
   export import DsCombobox = Module.Combobox;
 
   interface HTMLElementTagNameMap {
-    "ds-combobox": DsCombobox;
+    [Module.tagName]: DsCombobox;
   }
 }

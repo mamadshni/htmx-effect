@@ -4,11 +4,19 @@
  *
  *   <ds-calendar value="2026-10-12" min="2026-01-01" max="2026-12-31"></ds-calendar>
  *   <ds-calendar selection="range" months="2" value="2026-10-01/2026-10-05"></ds-calendar>
- *   <ds-calendar selection="multiple" value="2026-10-01 2026-10-03"></ds-calendar>
+ *   <ds-calendar selection="multiple" locale="de" value="2026-10-01 2026-10-03"></ds-calendar>
  *
- * Attributes: value, selection (single | range | multiple), min, max, months, locale,
- * first-day-of-week (0 = Sunday … 6), today, disallowed (dates), disallowed-weekdays.
- * Properties: value, isDateDisallowed(date), focusedDate. Methods: focus(), cancel().
+ * Inputs (property ↔ attribute, checked on the way in):
+ *   value ↔ value                     "YYYY-MM-DD", "start/end" (range) or dates (multiple)
+ *   selection ↔ selection             "single" | "range" | "multiple"
+ *   min, max, today ↔ same names      "YYYY-MM-DD" or ""
+ *   months ↔ months                   1…12, months shown side by side
+ *   locale ↔ locale                   "" = the nearest lang, else the browser's (text: en/de)
+ *   firstDayOfWeek ↔ first-day-of-week  0 (Sunday) … 6, or null for the locale's
+ *   disallowed ↔ disallowed           unavailable dates, separated by spaces
+ *   disallowedWeekdays ↔ disallowed-weekdays  unavailable weekdays (0-6)
+ *   isDateDisallowed (property only)  (date: Date) => boolean
+ * Also: focusedDate, focus(), cancel().
  * Events: change (a pick completed), rangestart, focusday, pagechange ({ start, end }).
  *
  * - Three views (day, month, year), each a CalendarView: the heading zooms out, picking a
@@ -34,12 +42,30 @@ import {
 } from "./date.js";
 import { DayView } from "./day-view.js";
 import { MonthView } from "./month-view.js";
-import { createSelection, type Selection } from "./selection.js";
+import { createSelection, selectionModes, type Selection, type SelectionMode } from "./selection.js";
 import type { CalendarView, ViewContext } from "./view.js";
 import { YearView } from "./year-view.js";
-import { dateAttribute, define, listenOn, setAria, unavailableDays } from "../shared.js";
+import { messagesFor } from "../messages.js";
+import {
+  accept,
+  assertIsDate,
+  assertIsDateList,
+  assertIsInteger,
+  assertIsOneOf,
+  assertIsPredicate,
+  assertIsString,
+  assertIsWeekdayList,
+  define,
+  listenOn,
+  reflect,
+  resolveLocale,
+  setAria,
+  unavailableDays,
+} from "../shared.js";
 
 namespace Module {
+  export const tagName = "ds-calendar" as const;
+
   const views = { day: new DayView(), month: new MonthView(), year: new YearView() };
   /** the heading zooms out one level */
   const zoomOut = { day: views.month, month: views.year, year: undefined };
@@ -54,48 +80,198 @@ namespace Module {
       "selection",
       "min",
       "max",
+      "today",
       "months",
       "locale",
       "first-day-of-week",
-      "today",
       "disallowed",
       "disallowed-weekdays",
-    ];
+    ] as const;
+
+    attributeChangedCallback(
+      name: (typeof Calendar.observedAttributes)[number],
+      oldValue: string | null,
+      newValue: string | null,
+    ) {
+      if (newValue === oldValue) return;
+      switch (name) {
+        case "value":
+          this.value = newValue ?? "";
+          break;
+        case "selection":
+          this.selection = (newValue ?? "single") as SelectionMode;
+          break;
+        case "min":
+        case "max":
+        case "today":
+        case "locale":
+        case "disallowed":
+          this[name] = newValue ?? "";
+          break;
+        case "months":
+          this.months = newValue === null ? 1 : Number(newValue);
+          break;
+        case "first-day-of-week":
+          this.firstDayOfWeek = newValue === null ? null : Number(newValue);
+          break;
+        case "disallowed-weekdays":
+          this.disallowedWeekdays = newValue ?? "";
+          break;
+      }
+    }
+
+    // ---- inputs ----
+
+    // the value as given (attributes may arrive before `selection`), parsed by the selection
+    #value = "";
+    #selection: Selection = createSelection("single");
+
+    get value() {
+      return this.#selection.value;
+    }
+    set value(value: string) {
+      if (accept(() => assertIsString(value, `${tagName}.value`))) {
+        this.#value = value;
+        this.#selection.set(value);
+      }
+      reflect(this, "value", this.#value);
+      this.#render();
+    }
+
+    get selection(): SelectionMode {
+      return this.#selection.mode;
+    }
+    set selection(value: SelectionMode) {
+      if (accept(() => assertIsOneOf(value, selectionModes, `${tagName}.selection`))) {
+        if (value !== this.#selection.mode) {
+          this.#selection = createSelection(value);
+          this.#selection.set(this.#value);
+        }
+      }
+      reflect(this, "selection", this.selection === "single" ? null : this.selection);
+      this.#render();
+    }
+
+    #min: IsoDate | "" = "";
+
+    get min() {
+      return this.#min;
+    }
+    set min(value: IsoDate | "") {
+      if (accept(() => assertIsDate(value, `${tagName}.min`))) this.#min = value;
+      reflect(this, "min", this.#min);
+      this.#refresh();
+    }
+
+    #max: IsoDate | "" = "";
+
+    get max() {
+      return this.#max;
+    }
+    set max(value: IsoDate | "") {
+      if (accept(() => assertIsDate(value, `${tagName}.max`))) this.#max = value;
+      reflect(this, "max", this.#max);
+      this.#refresh();
+    }
+
+    #today: IsoDate | "" = "";
+
+    /** "" = the real today */
+    get today() {
+      return this.#today;
+    }
+    set today(value: IsoDate | "") {
+      if (accept(() => assertIsDate(value, `${tagName}.today`))) this.#today = value;
+      reflect(this, "today", this.#today);
+      this.#render();
+    }
+
+    #months = 1;
+
+    get months() {
+      return this.#months;
+    }
+    set months(value: number) {
+      if (accept(() => assertIsInteger(value, `${tagName}.months`, 1, 12))) this.#months = value;
+      reflect(this, "months", this.#months === 1 ? null : this.#months);
+      this.#refresh();
+    }
+
+    #locale = "";
+
+    /** "" = the nearest lang, else the browser's */
+    get locale() {
+      return this.#locale;
+    }
+    set locale(value: string) {
+      if (accept(() => assertIsString(value, `${tagName}.locale`))) this.#locale = value;
+      reflect(this, "locale", this.#locale);
+      this.#render();
+    }
+
+    #firstDayOfWeek: number | null = null;
+
+    /** 0 = Sunday … 6 = Saturday; null = the locale's */
+    get firstDayOfWeek() {
+      return this.#firstDayOfWeek;
+    }
+    set firstDayOfWeek(value: number | null) {
+      const valid = accept(() => {
+        if (value !== null) assertIsInteger(value, `${tagName}.firstDayOfWeek`, 0, 6);
+      });
+      if (valid) this.#firstDayOfWeek = value;
+      reflect(this, "first-day-of-week", this.#firstDayOfWeek);
+      this.#render();
+    }
+
+    #disallowed = "";
+
+    /** unavailable dates, separated by spaces */
+    get disallowed() {
+      return this.#disallowed;
+    }
+    set disallowed(value: string) {
+      if (accept(() => assertIsDateList(value, `${tagName}.disallowed`))) this.#disallowed = value;
+      reflect(this, "disallowed", this.#disallowed);
+      this.#render();
+    }
+
+    #disallowedWeekdays = "";
+
+    /** unavailable weekdays (0 = Sunday … 6), separated by spaces */
+    get disallowedWeekdays() {
+      return this.#disallowedWeekdays;
+    }
+    set disallowedWeekdays(value: string) {
+      if (accept(() => assertIsWeekdayList(value, `${tagName}.disallowedWeekdays`))) {
+        this.#disallowedWeekdays = value;
+      }
+      reflect(this, "disallowed-weekdays", this.#disallowedWeekdays);
+      this.#render();
+    }
+
+    #isDateDisallowed: ((date: Date) => boolean) | undefined;
+
+    /** unavailable days, on top of `disallowed` and `disallowedWeekdays` (property only) */
+    get isDateDisallowed() {
+      return this.#isDateDisallowed;
+    }
+    set isDateDisallowed(value: ((date: Date) => boolean) | undefined) {
+      if (accept(() => assertIsPredicate(value, `${tagName}.isDateDisallowed`))) {
+        this.#isDateDisallowed = value;
+      }
+      this.#render();
+    }
+
+    // ---- state and methods ----
 
     #listeners?: AbortController;
     #id = "";
-    #selection: Selection = createSelection(null);
-    // a value set through the property before connecting wins over the attribute
-    #valueSet = false;
-    #isDateDisallowed?: ((date: Date) => boolean) | undefined;
     #view: CalendarView = views.day;
     /** the focused date (or the one that would be) */
     #cursor: IsoDate = todayIso();
     /** the first month shown in the day view */
     #page: IsoDate = startOfMonth(this.#cursor);
-
-    // ---- public API ----
-
-    /** "YYYY-MM-DD", "YYYY-MM-DD/YYYY-MM-DD" (range) or "YYYY-MM-DD YYYY-MM-DD …" (multiple) */
-    get value() {
-      return this.#selection.value;
-    }
-
-    set value(value: string) {
-      this.#valueSet = true;
-      this.#selection.set(value);
-      this.#render();
-    }
-
-    /** unavailable days, on top of the disallowed attributes */
-    get isDateDisallowed() {
-      return this.#isDateDisallowed;
-    }
-
-    set isDateDisallowed(predicate: ((date: Date) => boolean) | undefined) {
-      this.#isDateDisallowed = predicate;
-      this.#render();
-    }
 
     get focusedDate() {
       return this.#cursor;
@@ -104,7 +280,7 @@ namespace Module {
     /** show a date in the day view; anything but a date goes back to the selection (or today) */
     set focusedDate(date: string) {
       this.#view = views.day;
-      this.#cursor = this.#clamp(isIsoDate(date) ? date : this.#selection.first || this.#today);
+      this.#cursor = this.#clamp(isIsoDate(date) ? date : this.#selection.first || this.#todayOrNow);
       this.#page = startOfMonth(this.#cursor);
       this.#render();
     }
@@ -123,10 +299,7 @@ namespace Module {
     // ---- lifecycle ----
 
     connectedCallback() {
-      this.#id = this.id || `ds-calendar-${nextId++}`;
-      const value = this.#valueSet ? this.value : (this.getAttribute("value") ?? "");
-      this.#selection = createSelection(this.getAttribute("selection"));
-      this.#selection.set(value);
+      this.#id = this.id || `${tagName}-${nextId++}`;
       this.#build();
       this.focusedDate = "";
     }
@@ -135,51 +308,36 @@ namespace Module {
       this.#listeners?.abort();
     }
 
-    attributeChangedCallback(name: string, previous: string | null, next: string | null) {
-      if (!this.isConnected || previous === next) return;
-      if (name === "selection") {
-        const value = this.value;
-        this.#selection = createSelection(next);
-        this.#selection.set(value);
-      } else if (name === "value") {
-        this.#selection.set(next ?? "");
-      }
-      this.#cursor = this.#clamp(this.#cursor);
-      this.#render();
-    }
-
     // ---- derived state ----
 
-    get #today() {
-      return dateAttribute(this, "today") ?? todayIso();
-    }
-
-    get #months() {
-      const months = Number(this.getAttribute("months"));
-      return Number.isInteger(months) && months > 1 ? Math.min(months, 12) : 1;
+    get #todayOrNow() {
+      return this.#today || todayIso();
     }
 
     get #context(): ViewContext {
-      const locale = this.getAttribute("locale") || undefined;
-      const firstDay = Number(this.getAttribute("first-day-of-week") ?? NaN);
+      const locale = resolveLocale(this.#locale, this);
       return {
         id: this.#id,
-        min: dateAttribute(this, "min"),
-        max: dateAttribute(this, "max"),
-        today: this.#today,
+        min: this.#min || null,
+        max: this.#max || null,
+        today: this.#todayOrNow,
         locale,
-        firstDayOfWeek:
-          Number.isInteger(firstDay) && firstDay >= 0 && firstDay <= 6
-            ? firstDay
-            : localeFirstDayOfWeek(locale),
+        messages: messagesFor(locale),
+        firstDayOfWeek: this.#firstDayOfWeek ?? localeFirstDayOfWeek(locale),
         months: this.#months,
         selection: this.#selection,
-        isDisallowed: unavailableDays(this, this.#isDateDisallowed),
+        isDisallowed: unavailableDays(this.#disallowed, this.#disallowedWeekdays, this.#isDateDisallowed),
       };
     }
 
     #clamp(date: IsoDate) {
-      return clamp(date, dateAttribute(this, "min"), dateAttribute(this, "max"));
+      return clamp(date, this.#min || null, this.#max || null);
+    }
+
+    /** min/max/months changed: keep the cursor inside, then render */
+    #refresh() {
+      this.#cursor = this.#clamp(this.#cursor);
+      this.#render();
     }
 
     // ---- parts ----
@@ -260,13 +418,14 @@ namespace Module {
 
       // prev/next stay focusable at min/max (aria-disabled), so focus is never lost
       const [start, end] = view.bounds(page, context);
-      this.#setNav("previous", view.previousLabel, Boolean(context.min && start <= context.min));
-      this.#setNav("next", view.nextLabel, Boolean(context.max && end >= context.max));
+      this.#setNav("previous", view.previousLabel(context), Boolean(context.min && start <= context.min));
+      this.#setNav("next", view.nextLabel(context), Boolean(context.max && end >= context.max));
 
       const status = this.#part("status");
       if (status) {
-        status.textContent = this.#selection.status ?? "";
-        status.hidden = !this.#selection.status;
+        const step = this.#selection.step;
+        status.textContent = step ? context.messages[step === "start" ? "selectStart" : "selectEnd"] : "";
+        status.hidden = !step;
       }
 
       this.#preview(this.#cursor);
@@ -306,10 +465,9 @@ namespace Module {
     /** day view: turn the page so that the cursor is on it */
     #followCursor() {
       if (this.#view.name !== "day") return;
-      const months = this.#months;
       const offset = monthsBetween(this.#page, this.#cursor);
       if (offset < 0) this.#setPage(startOfMonth(this.#cursor));
-      else if (offset >= months) this.#setPage(addMonths(startOfMonth(this.#cursor), 1 - months));
+      else if (offset >= this.#months) this.#setPage(addMonths(startOfMonth(this.#cursor), 1 - this.#months));
     }
 
     #setPage(page: IsoDate) {
@@ -355,6 +513,10 @@ namespace Module {
 
       this.#cursor = date;
       const done = this.#selection.pick(date);
+      if (done) {
+        this.#value = this.#selection.value;
+        reflect(this, "value", this.#value);
+      }
       this.#followCursor();
       this.#render(true);
       if (done) this.#dispatch("change");
@@ -381,7 +543,7 @@ namespace Module {
   }
 }
 
-define("ds-calendar", Module.Calendar);
+define(Module.tagName, Module.Calendar);
 
 globalThis.DsCalendar = Module.Calendar;
 
@@ -392,6 +554,6 @@ declare global {
   export import DsCalendar = Module.Calendar;
 
   interface HTMLElementTagNameMap {
-    "ds-calendar": DsCalendar;
+    [Module.tagName]: DsCalendar;
   }
 }

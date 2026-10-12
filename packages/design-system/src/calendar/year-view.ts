@@ -7,8 +7,14 @@ const YEARS_PER_PAGE = 12;
 export class YearView extends CalendarView {
   readonly name = "year";
   readonly columns = 4;
-  readonly previousLabel = `Previous ${YEARS_PER_PAGE} years`;
-  readonly nextLabel = `Next ${YEARS_PER_PAGE} years`;
+
+  previousLabel({ messages }: ViewContext) {
+    return messages.previousYears(YEARS_PER_PAGE);
+  }
+
+  nextLabel({ messages }: ViewContext) {
+    return messages.nextYears(YEARS_PER_PAGE);
+  }
 
   heading(page: IsoDate) {
     const first = this.#firstYear(page);

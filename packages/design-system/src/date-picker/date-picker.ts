@@ -5,16 +5,21 @@
  *   <label for="due">Due date</label>
  *   <ds-date-picker id="due" name="due" min="2026-01-01" max="2026-12-31" required></ds-date-picker>
  *
- *   <label for="stay">Stay</label>
- *   <ds-date-picker id="stay" name="stay" range months="2" disallowed-weekdays="0 6"></ds-date-picker>
+ *   <label for="stay">Aufenthalt</label>
+ *   <ds-date-picker id="stay" name="stay" range months="2" locale="de"></ds-date-picker>
  *
- * - Values are ISO dates (YYYY-MM-DD); with `range` an ISO 8601 interval (start/end).
- *   `start` and `end` expose the two ends (equal for a single date).
- * - Calendar attributes (min, max, months, locale, first-day-of-week, today, disallowed,
- *   disallowed-weekdays) and the isDateDisallowed property are passed to the calendar.
+ * Inputs (property ↔ attribute, checked on the way in):
+ *   defaultValue ↔ value              the default; `value` is the current value (not reflected,
+ *                                     like <input>): "YYYY-MM-DD", or "start/end" with `range`
+ *   name, required, disabled, range ↔ same names
+ *   min, max, today, months, locale, firstDayOfWeek, disallowed, disallowedWeekdays,
+ *   isDateDisallowed                  as on <ds-calendar>, passed on to it
+ *
+ * - `start` and `end` expose the two ends (equal for a single date).
  * - The native <input type="date"> is used only on touch-first devices (`pointer: coarse`)
- *   and only when it can do everything asked for: `range` and unavailable days always get
+ *   and only when it can do everything asked for: ranges and unavailable days always get
  *   the calendar.
+ * - Text is English or German, by the locale (else the nearest lang, else the browser's).
  * - ElementInternals makes it a real form control: value in FormData, validation
  *   (required, min/max, unavailable days, bad input), reset, restore, <fieldset disabled>
  *   and <label for>. ARIA lives on the focusable inner parts, where focus actually is.
@@ -23,59 +28,114 @@
  */
 
 import "../calendar/calendar.js";
+import { format, type IsoDate } from "../calendar/date.js";
 import { createSelection, type Selection } from "../calendar/selection.js";
-import { dateAttribute, define, listenOn, unavailableDays, type Listen } from "../shared.js";
+import { messagesFor } from "../messages.js";
+import {
+  accept,
+  assertIsBoolean,
+  assertIsDate,
+  assertIsDateList,
+  assertIsInteger,
+  assertIsPredicate,
+  assertIsString,
+  assertIsWeekdayList,
+  define,
+  listenOn,
+  reflect,
+  resolveLocale,
+  unavailableDays,
+  type Listen,
+} from "../shared.js";
 
 namespace Module {
-  const FORMAT = "YYYY-MM-DD";
-  const RANGE_FORMAT = `${FORMAT} – ${FORMAT}`;
+  export const tagName = "ds-date-picker" as const;
+
   const touchFirst = matchMedia("(pointer: coarse)");
-
-  /** attributes passed straight to the calendar */
-  const CALENDAR_ATTRIBUTES = [
-    "min",
-    "max",
-    "months",
-    "locale",
-    "first-day-of-week",
-    "today",
-    "disallowed",
-    "disallowed-weekdays",
-  ];
-  /** attributes the native picker cannot honour: when present, the calendar is used */
-  const CALENDAR_ONLY = ["range", "disallowed", "disallowed-weekdays"];
-
+  const FULL_DATE = { day: "numeric", month: "long", year: "numeric" } as const;
   const CALENDAR_ICON = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M4 0h1v2h6V0h1v2h3v14H1V2h3zm10 5H2v10h12zM2 3v1h12V3z"/></svg>`;
 
   let nextId = 0;
 
   export class DatePicker extends HTMLElement {
     static formAssociated = true;
-    static observedAttributes = ["value", "required", "disabled", "range", ...CALENDAR_ATTRIBUTES];
+    static observedAttributes = [
+      "value",
+      "name",
+      "required",
+      "disabled",
+      "range",
+      "min",
+      "max",
+      "today",
+      "months",
+      "locale",
+      "first-day-of-week",
+      "disallowed",
+      "disallowed-weekdays",
+    ] as const;
+
+    attributeChangedCallback(
+      name: (typeof DatePicker.observedAttributes)[number],
+      oldValue: string | null,
+      newValue: string | null,
+    ) {
+      if (newValue === oldValue) return;
+      switch (name) {
+        case "value":
+          this.defaultValue = newValue ?? "";
+          break;
+        case "required":
+        case "disabled":
+        case "range":
+          this[name] = newValue !== null;
+          break;
+        case "name":
+        case "min":
+        case "max":
+        case "today":
+        case "locale":
+        case "disallowed":
+          this[name] = newValue ?? "";
+          break;
+        case "months":
+          this.months = newValue === null ? 1 : Number(newValue);
+          break;
+        case "first-day-of-week":
+          this.firstDayOfWeek = newValue === null ? null : Number(newValue);
+          break;
+        case "disallowed-weekdays":
+          this.disallowedWeekdays = newValue ?? "";
+          break;
+      }
+    }
 
     #internals = this.attachInternals();
-    #listeners?: AbortController;
-    #id = "";
-    #selection: Selection = createSelection(null);
-    #isDateDisallowed?: ((date: Date) => boolean) | undefined;
-    // like native inputs: once the value is edited, the `value` attribute is only the
-    // default again after a form reset
-    #dirty = false;
-    // typed text that is not a valid value
-    #badInput = false;
-    // disabled by a <fieldset disabled>
-    #disabledByForm = false;
-    // like :user-invalid, errors are only shown after an edit or a submit attempt
-    #showErrors = false;
 
-    // ---- form control API (mirrors native inputs) ----
+    // ---- inputs ----
 
-    /** "YYYY-MM-DD", or "YYYY-MM-DD/YYYY-MM-DD" with `range`; "" when empty */
+    #defaultValue = "";
+
+    /** the `value` attribute: the value until the user edits it, and again after a reset */
+    get defaultValue() {
+      return this.#defaultValue;
+    }
+    set defaultValue(value: string) {
+      if (accept(() => assertIsString(value, `${tagName}.defaultValue`))) this.#defaultValue = value;
+      reflect(this, "value", this.#defaultValue);
+      if (!this.#dirty) this.#setValue(this.#defaultValue);
+    }
+
+    // the value as given (attributes may arrive before `range`), parsed by the selection
+    #value = "";
+    #selection: Selection = createSelection("single");
+
+    /** the current value: "YYYY-MM-DD", or "YYYY-MM-DD/YYYY-MM-DD" with `range`; "" when empty */
     get value() {
       return this.#selection.value;
     }
-
     set value(value: string) {
+      if (!accept(() => assertIsString(value, `${tagName}.value`))) return;
       this.#dirty = true;
       this.#setValue(value);
     }
@@ -88,25 +148,167 @@ namespace Module {
       return this.#selection.last;
     }
 
-    /** unavailable days, on top of the disallowed attributes */
+    #name = "";
+
+    get name() {
+      return this.#name;
+    }
+    set name(value: string) {
+      if (accept(() => assertIsString(value, `${tagName}.name`))) this.#name = value;
+      reflect(this, "name", this.#name);
+    }
+
+    #required = false;
+
+    get required() {
+      return this.#required;
+    }
+    set required(value: boolean) {
+      if (accept(() => assertIsBoolean(value, `${tagName}.required`))) this.#required = value;
+      reflect(this, "required", this.#required);
+      this.#syncInput();
+      this.#validate();
+    }
+
+    #disabled = false;
+
+    get disabled() {
+      return this.#disabled;
+    }
+    set disabled(value: boolean) {
+      if (accept(() => assertIsBoolean(value, `${tagName}.disabled`))) this.#disabled = value;
+      reflect(this, "disabled", this.#disabled);
+      if (this.#isDisabled) this.#close(false);
+      this.#syncInput();
+    }
+
+    #range = false;
+
+    /** pick a start and an end */
+    get range() {
+      return this.#range;
+    }
+    set range(value: boolean) {
+      if (accept(() => assertIsBoolean(value, `${tagName}.range`))) {
+        if (value !== this.#range) {
+          this.#range = value;
+          this.#selection = createSelection(value ? "range" : "single");
+          this.#selection.set(this.#value);
+        }
+      }
+      reflect(this, "range", this.#range);
+      this.#rerender();
+    }
+
+    #min: IsoDate | "" = "";
+
+    get min() {
+      return this.#min;
+    }
+    set min(value: IsoDate | "") {
+      if (accept(() => assertIsDate(value, `${tagName}.min`))) this.#min = value;
+      reflect(this, "min", this.#min);
+      this.#syncAll();
+    }
+
+    #max: IsoDate | "" = "";
+
+    get max() {
+      return this.#max;
+    }
+    set max(value: IsoDate | "") {
+      if (accept(() => assertIsDate(value, `${tagName}.max`))) this.#max = value;
+      reflect(this, "max", this.#max);
+      this.#syncAll();
+    }
+
+    #today: IsoDate | "" = "";
+
+    get today() {
+      return this.#today;
+    }
+    set today(value: IsoDate | "") {
+      if (accept(() => assertIsDate(value, `${tagName}.today`))) this.#today = value;
+      reflect(this, "today", this.#today);
+      this.#syncCalendar();
+    }
+
+    #months = 1;
+
+    get months() {
+      return this.#months;
+    }
+    set months(value: number) {
+      if (accept(() => assertIsInteger(value, `${tagName}.months`, 1, 12))) this.#months = value;
+      reflect(this, "months", this.#months === 1 ? null : this.#months);
+      this.#syncCalendar();
+    }
+
+    #locale = "";
+
+    /** "" = the nearest lang, else the browser's */
+    get locale() {
+      return this.#locale;
+    }
+    set locale(value: string) {
+      if (accept(() => assertIsString(value, `${tagName}.locale`))) this.#locale = value;
+      reflect(this, "locale", this.#locale);
+      // new text everywhere
+      this.#rerender();
+    }
+
+    #firstDayOfWeek: number | null = null;
+
+    get firstDayOfWeek() {
+      return this.#firstDayOfWeek;
+    }
+    set firstDayOfWeek(value: number | null) {
+      const valid = accept(() => {
+        if (value !== null) assertIsInteger(value, `${tagName}.firstDayOfWeek`, 0, 6);
+      });
+      if (valid) this.#firstDayOfWeek = value;
+      reflect(this, "first-day-of-week", this.#firstDayOfWeek);
+      this.#syncCalendar();
+    }
+
+    #disallowed = "";
+
+    get disallowed() {
+      return this.#disallowed;
+    }
+    set disallowed(value: string) {
+      if (accept(() => assertIsDateList(value, `${tagName}.disallowed`))) this.#disallowed = value;
+      reflect(this, "disallowed", this.#disallowed);
+      this.#availabilityChanged();
+    }
+
+    #disallowedWeekdays = "";
+
+    get disallowedWeekdays() {
+      return this.#disallowedWeekdays;
+    }
+    set disallowedWeekdays(value: string) {
+      if (accept(() => assertIsWeekdayList(value, `${tagName}.disallowedWeekdays`))) {
+        this.#disallowedWeekdays = value;
+      }
+      reflect(this, "disallowed-weekdays", this.#disallowedWeekdays);
+      this.#availabilityChanged();
+    }
+
+    #isDateDisallowed: ((date: Date) => boolean) | undefined;
+
+    /** unavailable days, on top of `disallowed` and `disallowedWeekdays` (property only) */
     get isDateDisallowed() {
       return this.#isDateDisallowed;
     }
-
-    set isDateDisallowed(predicate: ((date: Date) => boolean) | undefined) {
-      const wasNative = this.#useNative;
-      this.#isDateDisallowed = predicate;
-      if (this.isConnected && wasNative !== this.#useNative) {
-        this.#render();
-      } else {
-        this.#syncCalendar();
-        this.#validate();
+    set isDateDisallowed(value: ((date: Date) => boolean) | undefined) {
+      if (accept(() => assertIsPredicate(value, `${tagName}.isDateDisallowed`))) {
+        this.#isDateDisallowed = value;
       }
+      this.#availabilityChanged();
     }
 
-    get name() {
-      return this.getAttribute("name") ?? "";
-    }
+    // ---- form control API (mirrors native inputs) ----
 
     get form() {
       return this.#internals.form;
@@ -136,13 +338,23 @@ namespace Module {
       return this.#internals.reportValidity();
     }
 
+    // ---- state ----
+
+    #listeners?: AbortController;
+    #id = "";
+    // like native inputs: once edited, the default only comes back with a form reset
+    #dirty = false;
+    // typed text that is not a valid value
+    #badInput = false;
+    // disabled by a <fieldset disabled>
+    #disabledByForm = false;
+    // like :user-invalid, errors are only shown after an edit or a submit attempt
+    #showErrors = false;
+
     // ---- lifecycle ----
 
     connectedCallback() {
-      this.#id = this.id || `ds-date-picker-${nextId++}`;
-      const value = this.#dirty ? this.value : (this.getAttribute("value") ?? "");
-      this.#selection = createSelection(this.#isRange ? "range" : "single");
-      this.#selection.set(value);
+      this.#id = this.id || `${tagName}-${nextId++}`;
       this.#render();
     }
 
@@ -150,29 +362,10 @@ namespace Module {
       this.#listeners?.abort();
     }
 
-    attributeChangedCallback(name: string, previous: string | null, next: string | null) {
-      if (!this.isConnected || previous === next) return;
-      if (name === "value") {
-        if (!this.#dirty) this.#setValue(next ?? "");
-      } else if (name === "range") {
-        const value = this.value;
-        this.#selection = createSelection(this.#isRange ? "range" : "single");
-        this.#selection.set(value);
-        this.#render();
-      } else if (CALENDAR_ONLY.includes(name) && touchFirst.matches) {
-        // may switch between the native input and the calendar
-        this.#render();
-      } else {
-        this.#syncInput();
-        this.#syncCalendar();
-        this.#validate();
-      }
-    }
-
     formResetCallback() {
       this.#dirty = false;
       this.#showErrors = false;
-      this.#setValue(this.getAttribute("value") ?? "");
+      this.#setValue(this.#defaultValue);
     }
 
     formStateRestoreCallback(state: unknown) {
@@ -185,7 +378,7 @@ namespace Module {
       this.#syncInput();
     }
 
-    // ---- parts and derived state ----
+    // ---- derived state ----
 
     #part<T extends HTMLElement = HTMLElement>(name: string) {
       return this.querySelector<T>(`.ds-date-picker__${name}`);
@@ -203,23 +396,31 @@ namespace Module {
       return this.#internals.states.has("open");
     }
 
-    get #isRange() {
-      return this.hasAttribute("range");
-    }
-
     get #isDisabled() {
-      return this.#disabledByForm || this.hasAttribute("disabled");
+      return this.#disabledByForm || this.#disabled;
     }
 
-    get #format() {
-      return this.#isRange ? RANGE_FORMAT : FORMAT;
+    get #resolvedLocale() {
+      return resolveLocale(this.#locale, this);
+    }
+
+    get #messages() {
+      return messagesFor(this.#resolvedLocale);
+    }
+
+    /** the typed format as shown in hints: YYYY-MM-DD (JJJJ-MM-TT in German), doubled for ranges */
+    get #pattern() {
+      const { datePattern } = this.#messages;
+      return this.#range ? `${datePattern} – ${datePattern}` : datePattern;
     }
 
     /** native picker only on touch-first devices, and only for what it supports */
     get #useNative() {
       return (
         touchFirst.matches &&
-        !CALENDAR_ONLY.some((name) => this.hasAttribute(name)) &&
+        !this.#range &&
+        !this.#disallowed &&
+        !this.#disallowedWeekdays &&
         !this.#isDateDisallowed
       );
     }
@@ -227,10 +428,22 @@ namespace Module {
     /** the selection as shown in the text input */
     get #text() {
       const { first, last } = this.#selection;
-      return this.#isRange && first ? `${first} – ${last}` : first;
+      return this.#range && first ? `${first} – ${last}` : first;
     }
 
     // ---- rendering ----
+
+    /** new parts (another mode, language or native ↔ calendar), once connected */
+    #rerender() {
+      if (this.isConnected) this.#render();
+      else this.#validate();
+    }
+
+    /** availability changed: may switch native ↔ calendar */
+    #availabilityChanged() {
+      if (this.isConnected && touchFirst.matches) this.#render();
+      else this.#syncAll();
+    }
 
     #render() {
       this.#listeners?.abort();
@@ -240,11 +453,10 @@ namespace Module {
 
       const states = this.#internals.states;
       states.delete("open");
-      if (this.#isRange) states.add("range");
+      if (this.#range) states.add("range");
       else states.delete("range");
 
-      const native = this.#useNative;
-      if (native) {
+      if (this.#useNative) {
         states.add("native");
         this.innerHTML = `<input type="date" class="ds-date-picker__input">`;
         // the browser picker always produces a valid ISO date
@@ -269,26 +481,26 @@ namespace Module {
         this.#validate();
       });
 
-      this.#syncInput();
-      this.#syncCalendar();
       this.#syncLabels();
+      this.#syncAll();
       this.#commit();
     }
 
     #renderCustom(on: Listen, signal: AbortSignal) {
       const id = this.#id;
-      const label = this.#isRange ? "Choose dates" : "Choose date";
+      const messages = this.#messages;
+      const label = this.#range ? messages.chooseDates : messages.chooseDate;
 
       this.innerHTML = `
         <div class="ds-date-picker__field">
           <input type="text" class="ds-date-picker__input" role="combobox" autocomplete="off"
-            placeholder="${this.#format}" aria-haspopup="dialog" aria-expanded="false"
+            placeholder="${this.#pattern}" aria-haspopup="dialog" aria-expanded="false"
             aria-controls="${id}-dialog" aria-describedby="${id}-hint">
           <button type="button" class="ds-date-picker__toggle" tabindex="-1"
             aria-label="${label}" aria-haspopup="dialog" aria-expanded="false"
             aria-controls="${id}-dialog">${CALENDAR_ICON}</button>
         </div>
-        <span id="${id}-hint" hidden>Format: ${this.#format}</span>
+        <span id="${id}-hint" hidden>${messages.formatHint(this.#pattern)}</span>
         <div id="${id}-dialog" class="ds-date-picker__dialog" role="dialog" aria-label="${label}"
           popover="manual">
           <ds-calendar></ds-calendar>
@@ -346,11 +558,12 @@ namespace Module {
       });
     }
 
-    // ---- state ----
+    // ---- value ----
 
-    /** a value from code: the attribute, the property, a reset or a restore */
+    /** a value from code: the default, the property, a reset or a restore */
     #setValue(value: string) {
       this.#badInput = false;
+      this.#value = value;
       this.#selection.set(value);
       this.#commit();
     }
@@ -360,7 +573,8 @@ namespace Module {
       this.#dirty = true;
       this.#showErrors = true;
       this.#badInput = text.trim() !== "" && !this.#selection.parse(text);
-      this.#selection.set(this.#badInput ? "" : text);
+      this.#value = this.#badInput ? "" : text;
+      this.#selection.set(this.#value);
       // bad text stays in the input so it can be corrected
       this.#commit(this.#badInput);
     }
@@ -381,21 +595,23 @@ namespace Module {
     #validate() {
       const input = this.#input ?? undefined;
       const { first, last } = this.#selection;
-      const min = dateAttribute(this, "min");
-      const max = dateAttribute(this, "max");
-      const what = this.#isRange ? "dates" : "a date";
-      const unavailable = first ? unavailableDays(this, this.#isDateDisallowed) : undefined;
+      const messages = this.#messages;
+      const range = this.#range;
+      const date = (iso: string) => format(iso, FULL_DATE, this.#resolvedLocale);
+      const unavailable = first
+        ? unavailableDays(this.#disallowed, this.#disallowedWeekdays, this.#isDateDisallowed)
+        : undefined;
 
       const [flag, message]: [keyof ValidityStateFlags, string] | [] = this.#badInput
-        ? ["badInput", `Enter ${what} as ${this.#format}.`]
-        : this.hasAttribute("required") && !first
-          ? ["valueMissing", `Please choose ${what}.`]
-          : first && min && first < min
-            ? ["rangeUnderflow", `Choose ${min} or later.`]
-            : last && max && last > max
-              ? ["rangeOverflow", `Choose ${max} or earlier.`]
+        ? ["badInput", (range ? messages.badInputRange : messages.badInput)(this.#pattern)]
+        : this.#required && !first
+          ? ["valueMissing", range ? messages.valueMissingRange : messages.valueMissing]
+          : first && this.#min && first < this.#min
+            ? ["rangeUnderflow", messages.rangeUnderflow(date(this.#min))]
+            : last && this.#max && last > this.#max
+              ? ["rangeOverflow", messages.rangeOverflow(date(this.#max))]
               : unavailable && (unavailable(first) || unavailable(last))
-                ? ["customError", "This date is not available."]
+                ? ["customError", messages.unavailable]
                 : [];
 
       if (flag) this.#internals.setValidity({ [flag]: true }, message, input);
@@ -405,34 +621,40 @@ namespace Module {
 
     // ---- syncing inner parts ----
 
-    /** mirror host attributes onto the inner input and toggle */
+    #syncAll() {
+      this.#syncInput();
+      this.#syncCalendar();
+      this.#validate();
+    }
+
+    /** the inner input and toggle follow disabled / required (and min/max on the native input) */
     #syncInput() {
       const input = this.#input;
       if (!input) return;
       input.disabled = this.#isDisabled;
       const toggle = this.#part<HTMLButtonElement>("toggle");
       if (toggle) toggle.disabled = this.#isDisabled;
-      input.setAttribute("aria-required", String(this.hasAttribute("required")));
+      input.setAttribute("aria-required", String(this.#required));
       if (input.type === "date") {
         // limits for the native picker; validity itself is reported by the host
-        for (const name of ["min", "max"]) {
-          const value = this.getAttribute(name);
-          if (value) input.setAttribute(name, value);
-          else input.removeAttribute(name);
-        }
+        input.min = this.#min;
+        input.max = this.#max;
       }
     }
 
-    /** pass the calendar attributes on */
+    /** pass the calendar inputs on */
     #syncCalendar() {
       const calendar = this.#calendar;
       if (!calendar) return;
-      calendar.setAttribute("selection", this.#isRange ? "range" : "single");
-      for (const name of CALENDAR_ATTRIBUTES) {
-        const value = this.getAttribute(name);
-        if (value === null) calendar.removeAttribute(name);
-        else calendar.setAttribute(name, value);
-      }
+      calendar.selection = this.#range ? "range" : "single";
+      calendar.min = this.#min;
+      calendar.max = this.#max;
+      calendar.today = this.#today;
+      calendar.months = this.#months;
+      calendar.locale = this.#locale;
+      calendar.firstDayOfWeek = this.#firstDayOfWeek;
+      calendar.disallowed = this.#disallowed;
+      calendar.disallowedWeekdays = this.#disallowedWeekdays;
       calendar.isDateDisallowed = this.#isDateDisallowed;
     }
 
@@ -484,7 +706,7 @@ namespace Module {
   }
 }
 
-define("ds-date-picker", Module.DatePicker);
+define(Module.tagName, Module.DatePicker);
 
 globalThis.DsDatePicker = Module.DatePicker;
 
@@ -495,6 +717,6 @@ declare global {
   export import DsDatePicker = Module.DatePicker;
 
   interface HTMLElementTagNameMap {
-    "ds-date-picker": DsDatePicker;
+    [Module.tagName]: DsDatePicker;
   }
 }

@@ -24,8 +24,13 @@ const FULL_DATE = { weekday: "long", day: "numeric", month: "long", year: "numer
 export class DayView extends CalendarView {
   readonly name = "day";
   readonly columns = 7;
-  readonly previousLabel = "Previous month";
-  readonly nextLabel = "Next month";
+  previousLabel({ messages }: ViewContext) {
+    return messages.previousMonth;
+  }
+
+  nextLabel({ messages }: ViewContext) {
+    return messages.nextMonth;
+  }
 
   heading(page: IsoDate, { months, locale }: ViewContext) {
     const first = startOfMonth(page);

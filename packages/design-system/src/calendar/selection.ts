@@ -1,6 +1,8 @@
 import { isIsoDate, parseDates, parseRange, type IsoDate } from "./date.js";
 
-export type SelectionMode = "single" | "range" | "multiple";
+export const selectionModes = ["single", "range", "multiple"] as const;
+
+export type SelectionMode = (typeof selectionModes)[number];
 
 /** what views need to know to mark selected cells */
 export interface SelectionState {
@@ -30,8 +32,8 @@ export abstract class Selection implements SelectionState {
   /** a day was picked; true when the selection is complete */
   abstract pick(date: IsoDate): boolean;
 
-  /** an instruction for the current step, for modes that have steps */
-  get status(): string | undefined {
+  /** the current step, for modes that pick in steps */
+  get step(): "start" | "end" | undefined {
     return undefined;
   }
 
@@ -103,8 +105,8 @@ export class RangeSelection extends Selection {
     return this.first ? `${this.first}/${this.last}` : "";
   }
 
-  get status() {
-    return this.#anchor ? "Select end date" : "Select start date";
+  get step() {
+    return this.#anchor ? ("end" as const) : ("start" as const);
   }
 
   get anchor() {
@@ -166,7 +168,7 @@ export class MultiSelection extends Selection {
   }
 }
 
-export const createSelection = (mode: string | null): Selection =>
+export const createSelection = (mode: SelectionMode): Selection =>
   mode === "range"
     ? new RangeSelection()
     : mode === "multiple"
