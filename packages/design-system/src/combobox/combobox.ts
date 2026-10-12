@@ -20,6 +20,8 @@
  * - Picking an option sets the input's value and fires a `change` event on the input.
  */
 
+import { define, listenOn } from "../shared.js";
+
 namespace Module {
   export class Combobox extends HTMLElement {
     #listeners?: AbortController;
@@ -57,11 +59,7 @@ namespace Module {
     connectedCallback() {
       // children may not be parsed yet, so parts are looked up lazily in every handler
       this.#listeners = new AbortController();
-      const { signal } = this.#listeners;
-      const on = <K extends keyof HTMLElementEventMap>(
-        type: K,
-        handler: (event: HTMLElementEventMap[K]) => void,
-      ) => this.addEventListener(type, handler, { signal });
+      const on = listenOn(this, this.#listeners.signal);
 
       on("keydown", (event) => this.#onKeyDown(event));
       on("focusin", (event) => {
@@ -192,9 +190,7 @@ namespace Module {
   }
 }
 
-if (!customElements.get("ds-combobox")) {
-  customElements.define("ds-combobox", Module.Combobox);
-}
+define("ds-combobox", Module.Combobox);
 
 globalThis.DsCombobox = Module.Combobox;
 

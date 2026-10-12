@@ -1,0 +1,147 @@
+ds-calendar {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  color: var(--ds-text);
+}
+
+/* ---- buttons: header (previous / heading / next) and cells ---- */
+
+ds-calendar button {
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: var(--ds-radius-small);
+  cursor: pointer;
+}
+ds-calendar button:hover {
+  background: var(--ds-hover);
+}
+ds-calendar button:focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: -2px;
+}
+/* outside min/max (disabled), unavailable or nothing further (aria-disabled) */
+ds-calendar button:is(:disabled, [aria-disabled="true"]) {
+  color: var(--ds-muted);
+  background: none;
+  cursor: default;
+}
+
+/* ---- header ---- */
+
+ds-calendar .ds-calendar__header {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+ds-calendar .ds-calendar__header button {
+  min-inline-size: 2rem;
+  padding: 0.25rem 0.5rem;
+}
+ds-calendar .ds-calendar__heading {
+  flex: 1;
+  font-weight: bold;
+}
+/* at the top level the heading is just a label */
+ds-calendar .ds-calendar__heading[aria-disabled="true"] {
+  color: inherit;
+}
+/* the arrows point in the reading direction */
+ds-calendar:dir(rtl) :is(.ds-calendar__previous, .ds-calendar__next) {
+  transform: scaleX(-1);
+}
+
+/* ---- months ---- */
+
+ds-calendar .ds-calendar__body {
+  display: flex;
+  gap: 1.5rem;
+}
+ds-calendar .ds-calendar__month-title {
+  margin: 0 0 0.25rem;
+  font-size: 0.9rem;
+  text-align: center;
+}
+/* with one month the header already names it */
+ds-calendar[data-months="1"] .ds-calendar__month-title {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* the same footprint for all three views, so nothing jumps when zooming */
+ds-calendar .ds-calendar__table {
+  inline-size: 15.75rem;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+ds-calendar th {
+  padding: 0.25rem 0;
+  font-size: 0.8rem;
+  font-weight: normal;
+  color: var(--ds-muted);
+}
+ds-calendar td {
+  padding: 0;
+  text-align: center;
+}
+
+/* ---- cells ---- */
+
+ds-calendar td button {
+  inline-size: 100%;
+  block-size: 2.25rem;
+  font-variant-numeric: tabular-nums;
+}
+ds-calendar .ds-calendar__table:not([data-view="day"]) td button {
+  block-size: 3.75rem;
+}
+ds-calendar td button[data-outside] {
+  color: var(--ds-muted);
+  opacity: 0.6;
+}
+ds-calendar td button[aria-current="date"] {
+  font-weight: bold;
+}
+ds-calendar td button[aria-disabled="true"] {
+  text-decoration: line-through;
+}
+
+/* selected: solid; in a range only the ends are solid and the days between are light */
+ds-calendar td button:is([aria-pressed="true"], [data-selected]),
+ds-calendar[selection="range"] td button:is([data-range-start], [data-range-end]),
+ds-calendar [data-picking] td button[data-anchor] {
+  background: var(--ds-accent);
+  color: var(--ds-accent-contrast);
+}
+ds-calendar[selection="range"] td button[aria-pressed="true"]:not([data-range-start], [data-range-end]),
+ds-calendar [data-picking] td button[data-preview]:not([data-anchor]) {
+  background: var(--ds-accent-soft);
+  color: inherit;
+  border-radius: 0;
+}
+ds-calendar[selection="range"] td button[data-range-start]:not([data-range-end]) {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+ds-calendar[selection="range"] td button[data-range-end]:not([data-range-start]) {
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+}
+/* while the second end is being chosen, the old range steps back for the preview */
+ds-calendar [data-picking] td button[aria-pressed="true"]:not([data-preview]) {
+  background: none;
+  color: inherit;
+}
+
+ds-calendar .ds-calendar__status {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ds-muted);
+}

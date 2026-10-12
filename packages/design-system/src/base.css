@@ -1,0 +1,51 @@
+/*
+ * Design tokens. Defined on :root with zero specificity, so a page (or any ancestor of a
+ * component) can override them: `.dark-card { --ds-surface: #111; }`.
+ */
+:where(:root) {
+  --ds-accent: #2563eb;
+  --ds-accent-contrast: #fff;
+  --ds-accent-soft: #dbeafe;
+  --ds-surface: Canvas;
+  --ds-text: CanvasText;
+  --ds-muted: GrayText;
+  --ds-hover: #f2f2f2;
+  --ds-border: #d0d7de;
+  --ds-danger: #dc2626;
+  --ds-radius: 6px;
+  --ds-radius-small: 4px;
+  --ds-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+}
+
+/* ---- fields: text inputs and the buttons next to them ---- */
+
+:is(ds-combobox input[role="combobox"], .ds-date-picker__input, .ds-date-picker__toggle) {
+  box-sizing: border-box;
+  font: inherit;
+  color: var(--ds-text);
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+}
+:is(ds-combobox input[role="combobox"], .ds-date-picker__input) {
+  padding: 0.5rem 0.65rem;
+}
+:is(ds-combobox input[role="combobox"], .ds-date-picker__input):focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: -1px;
+  border-color: transparent;
+}
+
+/* ---- popovers: top layer, below the anchor from its start edge, above when there is no room ---- */
+
+:is(ds-combobox [role="listbox"], .ds-date-picker__dialog) {
+  position-area: block-end span-inline-end;
+  position-try-fallbacks: flip-block;
+  inset: auto;
+  margin: 0.25rem 0;
+  color: var(--ds-text);
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+  box-shadow: var(--ds-shadow);
+}

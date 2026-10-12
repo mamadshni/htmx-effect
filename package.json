@@ -6,6 +6,7 @@
     "dev": "pnpm --filter @combo/design-system build && pnpm --filter @combo/app dev",
     "build": "pnpm -r run build",
     "typecheck": "pnpm -r run build:types && pnpm -r run typecheck",
+    "test": "pnpm -r run test",
     "clean": "pnpm -r run clean && rm -rf node_modules apps/*/node_modules packages/*/node_modules"
   },
   "packageManager": "pnpm@11.20.0"

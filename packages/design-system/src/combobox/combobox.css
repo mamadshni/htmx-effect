@@ -1,0 +1,37 @@
+/* field and popover look: base.css */
+
+/* one anchor name per combobox, so several on a page do not clash */
+ds-combobox {
+  display: block;
+  anchor-scope: --ds-combobox;
+}
+ds-combobox input[role="combobox"] {
+  anchor-name: --ds-combobox;
+  inline-size: 100%;
+}
+
+/* the options: as wide as the input */
+ds-combobox [role="listbox"] {
+  position-anchor: --ds-combobox;
+  box-sizing: border-box;
+  inline-size: anchor-size(inline);
+  max-block-size: 15rem;
+  overflow-y: auto;
+  padding: 0;
+  list-style: none;
+}
+ds-combobox [role="option"] {
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+}
+ds-combobox [role="option"]:not([aria-disabled="true"]):hover {
+  background: var(--ds-hover);
+}
+ds-combobox [role="option"][aria-disabled="true"] {
+  color: var(--ds-muted);
+  cursor: default;
+}
+ds-combobox [role="option"][aria-selected="true"] {
+  background: var(--ds-accent);
+  color: var(--ds-accent-contrast);
+}

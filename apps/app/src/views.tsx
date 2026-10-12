@@ -27,8 +27,12 @@ export const Page = ({ items }: { items: ReadonlyArray<string> }) => (
 
         <Section id="date-range-picker" title="Date range picker">
           <Field id="stay" label="Stay">
-            <ds-date-picker id="stay" name="stay" range min="2026-01-01" max="2026-12-31" />
+            <ds-date-picker id="stay" name="stay" range months={2} min="2026-01-01" max="2026-12-31" />
           </Field>
+        </Section>
+
+        <Section id="calendar" title="Calendar">
+          <ds-calendar selection="multiple" disallowed-weekdays="0 6" />
         </Section>
       </main>
 

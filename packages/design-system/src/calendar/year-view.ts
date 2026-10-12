@@ -1,23 +1,28 @@
-import { addYears, fromParts, overlaps, partsOf, todayIso, type IsoDate } from "./date.js";
-import { DatePickerView, type ViewContext } from "./view.js";
+import { addYears, fromParts, overlaps, partsOf, type IsoDate } from "./date.js";
+import { CalendarView, type ViewContext } from "./view.js";
 
 const YEARS_PER_PAGE = 12;
 
 /** a page of 12 years, aligned to multiples of 12 (e.g. 2016–2027) */
-export class YearView extends DatePickerView {
+export class YearView extends CalendarView {
   readonly name = "year";
   readonly columns = 4;
   readonly previousLabel = `Previous ${YEARS_PER_PAGE} years`;
   readonly nextLabel = `Next ${YEARS_PER_PAGE} years`;
 
-  heading(cursor: IsoDate) {
-    const first = this.#firstYear(cursor);
+  heading(page: IsoDate) {
+    const first = this.#firstYear(page);
     return `${first} – ${first + YEARS_PER_PAGE - 1}`;
   }
 
-  cells(cursor: IsoDate, { start, end, min, max }: ViewContext) {
-    const first = this.#firstYear(cursor);
-    const thisYear = this.unitOf(todayIso());
+  bounds(page: IsoDate) {
+    const first = this.#firstYear(page);
+    return [fromParts(first, 0, 1), fromParts(first + YEARS_PER_PAGE - 1, 11, 31)] as const;
+  }
+
+  cells(page: IsoDate, { min, max, today, selection }: ViewContext) {
+    const first = this.#firstYear(page);
+    const thisYear = this.unitOf(today);
 
     return Array.from({ length: YEARS_PER_PAGE }, (_, i) => {
       const year = first + i;
@@ -26,15 +31,15 @@ export class YearView extends DatePickerView {
       return {
         date,
         label: String(year),
-        selected: Boolean(start && overlaps(date, last, start, end)),
+        selected: selection.overlaps(date, last),
         current: date === thisYear,
         disabled: !overlaps(date, last, min, max),
       };
     });
   }
 
-  unitOf(cursor: IsoDate) {
-    return fromParts(partsOf(cursor).year, 0, 1);
+  unitOf(date: IsoDate) {
+    return fromParts(partsOf(date).year, 0, 1);
   }
 
   offset(cursor: IsoDate, years: number) {
@@ -45,8 +50,8 @@ export class YearView extends DatePickerView {
     return addYears(cursor, pages * YEARS_PER_PAGE * (large ? 10 : 1));
   }
 
-  #firstYear(cursor: IsoDate) {
-    const { year } = partsOf(cursor);
+  #firstYear(page: IsoDate) {
+    const { year } = partsOf(page);
     return Math.floor(year / YEARS_PER_PAGE) * YEARS_PER_PAGE;
   }
 }

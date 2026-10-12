@@ -12,12 +12,17 @@
   "scripts": {
     "clean": "rm -rf bundle",
     "build": "pnpm run clean && pnpm run build:bundle && pnpm run build:types",
-    "build:bundle": "esbuild src/index.ts src/index.css --bundle --format=iife --target=es2022 --sourcemap --outdir=bundle",
+    "build:bundle": "esbuild src/index.ts src/index.css --bundle --minify --sourcemap --format=iife --target=es2022 --outdir=bundle",
     "build:types": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc -p test --noEmit",
+    "test": "vitest run"
   },
   "devDependencies": {
+    "@vitest/browser": "^5.0.3",
+    "@vitest/browser-playwright": "^5.0.3",
     "esbuild": "^0.28.2",
-    "typescript": "^6.0.3"
+    "playwright": "^1.64.0",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.3"
   }
 }
