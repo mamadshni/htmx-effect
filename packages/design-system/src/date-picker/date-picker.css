@@ -1,0 +1,176 @@
+/* one anchor name per date picker, so several on a page do not clash */
+ds-date-picker {
+  display: inline-block;
+  anchor-scope: --ds-date-picker;
+}
+ds-date-picker .ds-date-picker__field {
+  anchor-name: --ds-date-picker;
+  display: flex;
+  gap: 0.25rem;
+}
+ds-date-picker .ds-date-picker__input {
+  box-sizing: border-box;
+  width: 13ch;
+  padding: 0.5rem 0.65rem;
+  font: inherit;
+  background: Canvas;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+}
+ds-date-picker:state(range) .ds-date-picker__input {
+  width: 26ch;
+}
+ds-date-picker:state(native) .ds-date-picker__input {
+  width: auto;
+}
+ds-date-picker .ds-date-picker__input:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -1px;
+  border-color: transparent;
+}
+ds-date-picker .ds-date-picker__input[aria-invalid="true"]:not(:focus) {
+  border-color: #dc2626;
+}
+ds-date-picker .ds-date-picker__toggle {
+  display: grid;
+  place-items: center;
+  padding: 0 0.65rem;
+  font: inherit;
+  color: inherit;
+  background: Canvas;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  cursor: pointer;
+}
+ds-date-picker .ds-date-picker__toggle:hover {
+  background: #f2f2f2;
+}
+
+/* calendar popover: top layer, anchored under the field, flips above when needed */
+ds-date-picker .ds-date-picker__dialog {
+  position-anchor: --ds-date-picker;
+  inset: auto;
+  top: anchor(bottom);
+  left: anchor(left);
+  position-try-fallbacks: flip-block;
+  margin: 0.25rem 0;
+  padding: 0.5rem;
+  background: Canvas;
+  color: CanvasText;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+ds-date-picker .ds-date-picker__header {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+ds-date-picker .ds-date-picker__header button {
+  min-width: 2rem;
+  padding: 0.25rem 0.5rem;
+  font: inherit;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+ds-date-picker .ds-date-picker__header button:hover {
+  background: #f2f2f2;
+}
+ds-date-picker .ds-date-picker__heading {
+  flex: 1;
+  font-weight: bold;
+}
+ds-date-picker .ds-date-picker__heading[aria-disabled="true"] {
+  cursor: default;
+  background: none;
+}
+
+/* the same footprint for all three views, so the popover does not jump when zooming */
+ds-date-picker .ds-date-picker__grid {
+  width: 15.75rem;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+ds-date-picker th {
+  padding: 0.25rem 0;
+  font-size: 0.8rem;
+  font-weight: normal;
+  color: GrayText;
+}
+ds-date-picker td {
+  height: 2.25rem;
+  padding: 0;
+  text-align: center;
+  border-radius: 4px;
+}
+ds-date-picker .ds-date-picker__grid:is([data-view="month"], [data-view="year"]) td {
+  height: 3.75rem;
+}
+ds-date-picker td[data-date] {
+  cursor: pointer;
+}
+ds-date-picker td[data-date]:hover {
+  background: #f2f2f2;
+}
+ds-date-picker td[data-date]:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+ds-date-picker td[data-outside] {
+  color: GrayText;
+  opacity: 0.6;
+}
+ds-date-picker td[aria-current="date"] {
+  font-weight: bold;
+}
+ds-date-picker td[aria-selected="true"] {
+  background: #2563eb;
+  color: #fff;
+}
+
+/* range mode: ends solid, days in between light */
+ds-date-picker [aria-multiselectable="true"] td[aria-selected="true"] {
+  background: #dbeafe;
+  color: inherit;
+  border-radius: 0;
+}
+ds-date-picker [aria-multiselectable="true"] td:is([data-range-start], [data-range-end]) {
+  background: #2563eb;
+  color: #fff;
+}
+ds-date-picker [aria-multiselectable="true"] td[data-range-start] {
+  border-radius: 4px 0 0 4px;
+}
+ds-date-picker [aria-multiselectable="true"] td[data-range-end] {
+  border-radius: 0 4px 4px 0;
+}
+ds-date-picker [aria-multiselectable="true"] td[data-range-start][data-range-end] {
+  border-radius: 4px;
+}
+/* while the second end is being chosen, the old range steps back for the preview */
+ds-date-picker [data-picking] td[aria-selected="true"] {
+  background: none;
+  color: inherit;
+}
+ds-date-picker [data-picking] td[data-preview] {
+  background: #dbeafe;
+  border-radius: 0;
+}
+ds-date-picker [data-picking] td[data-anchor] {
+  background: #2563eb;
+  color: #fff;
+  border-radius: 4px;
+}
+ds-date-picker .ds-date-picker__status {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: GrayText;
+}
+
+ds-date-picker td[aria-disabled="true"] {
+  color: GrayText;
+  cursor: default;
+  background: none;
+}

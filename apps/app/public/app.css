@@ -1,0 +1,125 @@
+/* Playground styles. Class-based only, so design-system components keep their own look. */
+
+:root {
+  color-scheme: light;
+  --bg: #f6f7f9;
+  --surface: #fff;
+  --text: #1f2328;
+  --border: #e3e6ea;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --radius: 10px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+}
+
+h1,
+h2 {
+  margin: 0;
+  line-height: 1.25;
+}
+
+/* ---- page ---- */
+
+.page {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 3rem 1rem 4rem;
+}
+
+.page h1 {
+  margin-bottom: 0.75rem;
+  font-size: 1.75rem;
+}
+
+/* ---- cards ---- */
+
+.card {
+  display: grid;
+  justify-items: start;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+}
+
+.card__title {
+  font-size: 1.125rem;
+}
+
+.field {
+  display: grid;
+  justify-items: start;
+  gap: 0.35rem;
+}
+
+.field__label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* ---- buttons ---- */
+
+.button {
+  padding: 0.5rem 1rem;
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--accent-hover);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.button--ghost {
+  color: var(--text);
+  background: none;
+}
+
+.button--ghost:hover {
+  background: var(--bg);
+}
+
+/* ---- search dialog ---- */
+
+.search-dialog {
+  width: min(28rem, calc(100vw - 2rem));
+  padding: 1.25rem;
+  border: 0;
+  border-radius: var(--radius);
+  box-shadow: 0 20px 50px rgb(0 0 0 / 0.2);
+}
+
+.search-dialog::backdrop {
+  background: rgb(15 23 42 / 0.35);
+}
+
+.search-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.search-dialog__header h2 {
+  font-size: 1.125rem;
+}
