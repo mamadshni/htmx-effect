@@ -27,7 +27,11 @@
  * - Custom states for styling: :state(native), :state(range), :state(open).
  */
 
-import "../calendar/calendar.js";
+import "../calendar/calendar-date.js";
+import "../calendar/calendar-range.js";
+import "../calendar/calendar-select-month.js";
+import "../calendar/calendar-select-year.js";
+import type { CalendarBase } from "../calendar/calendar-base.js";
 import { format, type IsoDate } from "../calendar/date.js";
 import { createSelection, type Selection } from "../calendar/selection.js";
 import { messagesFor } from "../messages.js";
@@ -388,8 +392,9 @@ namespace Module {
       return this.#part<HTMLInputElement>("input");
     }
 
+    /** the calendar container in the popover: <ds-calendar> or <ds-calendar-range> */
     get #calendar() {
-      return this.querySelector("ds-calendar");
+      return this.querySelector<CalendarBase>("ds-calendar, ds-calendar-range");
     }
 
     get #isOpen() {
@@ -423,6 +428,10 @@ namespace Module {
         !this.#disallowedWeekdays &&
         !this.#isDateDisallowed
       );
+    }
+
+    get #calendarTag() {
+      return this.#range ? "ds-calendar-range" : "ds-calendar";
     }
 
     /** the selection as shown in the text input */
@@ -503,7 +512,10 @@ namespace Module {
         <span id="${id}-hint" hidden>${messages.formatHint(this.#pattern)}</span>
         <div id="${id}-dialog" class="ds-date-picker__dialog" role="dialog" aria-label="${label}"
           popover="manual">
-          <ds-calendar></ds-calendar>
+          <${this.#calendarTag}>
+            <ds-calendar-select-month></ds-calendar-select-month>
+            <ds-calendar-select-year></ds-calendar-select-year>
+          </${this.#calendarTag}>
         </div>`;
 
       // a completed pick; the calendar's own change stays inside (the input reports one)
@@ -529,7 +541,9 @@ namespace Module {
       // buttons, so focus would jump to <body> and close the popover); the calendar
       // moves focus itself when a day is clicked
       on("mousedown", (event) => {
-        if (this.#part("dialog")?.contains(event.target as Node)) event.preventDefault();
+        const target = event.target as Element;
+        // except form controls: a <select> would not open
+        if (this.#part("dialog")?.contains(target) && !target.closest("select")) event.preventDefault();
       });
 
       on("focusout", (event) => {
@@ -646,7 +660,6 @@ namespace Module {
     #syncCalendar() {
       const calendar = this.#calendar;
       if (!calendar) return;
-      calendar.selection = this.#range ? "range" : "single";
       calendar.min = this.#min;
       calendar.max = this.#max;
       calendar.today = this.#today;
@@ -656,6 +669,8 @@ namespace Module {
       calendar.disallowed = this.#disallowed;
       calendar.disallowedWeekdays = this.#disallowedWeekdays;
       calendar.isDateDisallowed = this.#isDateDisallowed;
+      // one month: fill the empty cells with the neighbouring days
+      calendar.showOutsideDays = this.#months === 1;
     }
 
     /** the accessible name comes from <label for> (via ElementInternals) or aria-label */

@@ -3,11 +3,16 @@ import { userEvent } from "vitest/browser";
 import { $, mount } from "./helpers.js";
 
 const heading = () => $(".ds-calendar__heading").textContent;
-const day = (date: string) => $<HTMLButtonElement>(`button[data-date="${date}"]`);
+const day = (date: string) => $<HTMLButtonElement>(`button[data-date="${date}"]:not([data-outside])`);
 
 describe("localization", () => {
   it("formats the calendar and its labels in German", async () => {
-    await mount(`<ds-calendar locale="de-DE" today="2026-10-12" selection="range" value="2026-10-20/2026-10-22"></ds-calendar>`);
+    await mount(`
+      <ds-calendar-range locale="de-DE" today="2026-10-12" value="2026-10-20/2026-10-22">
+        <ds-calendar-select-month></ds-calendar-select-month>
+        <ds-calendar-select-year></ds-calendar-select-year>
+        <ds-calendar-month></ds-calendar-month>
+      </ds-calendar-range>`);
     expect(heading()).toBe("Oktober 2026");
     expect($("th").getAttribute("abbr")).toBe("Montag"); // German weeks start on Monday
     expect(day("2026-10-20").getAttribute("aria-label")).toBe("Dienstag, 20. Oktober 2026");
@@ -16,8 +21,9 @@ describe("localization", () => {
 
     await userEvent.click(day("2026-10-14"));
     expect($(".ds-calendar__status").textContent).toBe("Enddatum wählen");
-    await userEvent.click($(".ds-calendar__heading"));
-    expect($(".ds-calendar__previous").getAttribute("aria-label")).toBe("Vorheriges Jahr");
+    expect($("ds-calendar-select-month label").textContent).toBe("Monat");
+    expect($("ds-calendar-select-year label").textContent).toBe("Jahr");
+    expect($<HTMLSelectElement>("ds-calendar-select-month select").selectedOptions[0]?.textContent).toBe("Oktober");
   });
 
   it("takes the language from the nearest lang when there is no locale", async () => {

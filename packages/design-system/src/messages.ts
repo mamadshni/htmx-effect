@@ -6,10 +6,9 @@
 export interface Messages {
   previousMonth: string;
   nextMonth: string;
-  previousYear: string;
-  nextYear: string;
-  previousYears: (count: number) => string;
-  nextYears: (count: number) => string;
+  /** labels of the month and year selects */
+  month: string;
+  year: string;
   /** range picking: the two steps */
   selectStart: string;
   selectEnd: string;
@@ -30,10 +29,8 @@ export interface Messages {
 const en: Messages = {
   previousMonth: "Previous month",
   nextMonth: "Next month",
-  previousYear: "Previous year",
-  nextYear: "Next year",
-  previousYears: (count) => `Previous ${count} years`,
-  nextYears: (count) => `Next ${count} years`,
+  month: "Month",
+  year: "Year",
   selectStart: "Select start date",
   selectEnd: "Select end date",
   chooseDate: "Choose date",
@@ -52,10 +49,8 @@ const en: Messages = {
 const de: Messages = {
   previousMonth: "Vorheriger Monat",
   nextMonth: "Nächster Monat",
-  previousYear: "Vorheriges Jahr",
-  nextYear: "Nächstes Jahr",
-  previousYears: (count) => `Vorherige ${count} Jahre`,
-  nextYears: (count) => `Nächste ${count} Jahre`,
+  month: "Monat",
+  year: "Jahr",
   selectStart: "Startdatum wählen",
   selectEnd: "Enddatum wählen",
   chooseDate: "Datum wählen",

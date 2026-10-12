@@ -11,7 +11,7 @@ const form = (attributes = "") => `
 const picker = () => $("ds-date-picker");
 const input = () => $<HTMLInputElement>(".ds-date-picker__input");
 const isOpen = () => $(".ds-date-picker__dialog").matches(":popover-open");
-const day = (date: string) => $<HTMLButtonElement>(`button[data-date="${date}"]`);
+const day = (date: string) => $<HTMLButtonElement>(`button[data-date="${date}"]:not([data-outside])`);
 
 describe("ds-date-picker", () => {
   it("is a labelled form control", async () => {
@@ -72,13 +72,30 @@ describe("ds-date-picker", () => {
   it("picks a range across two months", async () => {
     await mount(form(`range months="2"`));
     $<HTMLButtonElement>(".ds-date-picker__toggle").click();
-    expect(document.querySelectorAll(".ds-calendar__table").length).toBe(2);
+    expect(document.querySelectorAll("ds-calendar-range ds-calendar-month").length).toBe(2);
     await userEvent.click(day("2026-11-03"));
     await userEvent.click(day("2026-10-28"));
     expect(picker().value).toBe("2026-10-28/2026-11-03");
     expect([picker().start, picker().end]).toEqual(["2026-10-28", "2026-11-03"]);
     expect(input().value).toBe("2026-10-28 – 2026-11-03");
     expect(new FormData($("form")).get("due")).toBe("2026-10-28/2026-11-03");
+  });
+
+  it("lets the selects in the popover open (their mousedown is not cancelled)", async () => {
+    await mount(form());
+    $<HTMLButtonElement>(".ds-date-picker__toggle").click();
+    const mousedown = (target: Element) => {
+      const event = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+      target.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    expect($(".ds-calendar__selects").children.length).toBe(2);
+    expect(mousedown($("ds-calendar-select-year select"))).toBe(false);
+    expect(mousedown(day("2026-10-14"))).toBe(true); // days still keep the focus where it is
+
+    await userEvent.selectOptions($<HTMLSelectElement>("ds-calendar-select-year select"), "2027-10-12");
+    expect(isOpen()).toBe(true);
+    expect($(".ds-calendar__heading").textContent).toBe("October 2027");
   });
 
   it("resets with the form", async () => {

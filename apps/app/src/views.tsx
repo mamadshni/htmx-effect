@@ -32,7 +32,24 @@ export const Page = ({ items }: { items: ReadonlyArray<string> }) => (
         </Section>
 
         <Section id="calendar" title="Calendar">
-          <ds-calendar selection="multiple" disallowed-weekdays="0 6" />
+          <ds-calendar show-outside-days>
+            <ds-calendar-select-month />
+            <ds-calendar-select-year />
+            <ds-calendar-month />
+          </ds-calendar>
+        </Section>
+
+        <Section id="calendar-range" title="Calendar range">
+          <ds-calendar-range months={2}>
+            <ds-calendar-month />
+            <ds-calendar-month offset={1} />
+          </ds-calendar-range>
+        </Section>
+
+        <Section id="calendar-multi" title="Calendar multi">
+          <ds-calendar-multi disallowed-weekdays="0 6">
+            <ds-calendar-month />
+          </ds-calendar-multi>
         </Section>
 
         <Section id="german" title="Zeitraum (Deutsch)" lang="de">
