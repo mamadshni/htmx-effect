@@ -16,3 +16,6 @@ export type { DsCalendarMonth } from "./calendar/calendar-month.js";
 export type { DsCalendarSelectMonth } from "./calendar/calendar-select-month.js";
 export type { DsCalendarSelectYear } from "./calendar/calendar-select-year.js";
 export type { DsDatePicker } from "./date-picker/date-picker.js";
+export type { DatePredicate } from "./shared.js";
+/** dates in properties and event details are Temporal.PlainDate */
+export type { Temporal } from "@js-temporal/polyfill";

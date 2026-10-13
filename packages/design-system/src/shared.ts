@@ -1,6 +1,9 @@
 /** Small helpers shared by the components. */
 
-import { isIsoDate, parseDates, parseIso, parseWeekdays, weekdayOf, type IsoDate } from "./calendar/date.js";
+import { isIsoDate, parseDates, parseWeekdays, weekdayOf, type PlainDate } from "./calendar/date.js";
+
+/** a rule for unavailable days (the `isDateDisallowed` property) */
+export type DatePredicate = (date: PlainDate) => boolean;
 
 // ---- elements ----
 
@@ -46,7 +49,7 @@ export function assertIsBoolean(value: unknown, name: string): asserts value is 
 }
 
 /** a date (YYYY-MM-DD), or "" for none */
-export function assertIsDate(value: unknown, name: string): asserts value is IsoDate | "" {
+export function assertIsDate(value: unknown, name: string): asserts value is string {
   assertIsString(value, name);
   if (value !== "" && !isIsoDate(value)) fail(name, "a date (YYYY-MM-DD)", value);
 }
@@ -87,7 +90,7 @@ export function assertIsOneOf<T extends string>(
 export function assertIsPredicate(
   value: unknown,
   name: string,
-): asserts value is ((date: Date) => boolean) | undefined {
+): asserts value is DatePredicate | undefined {
   if (value !== undefined && typeof value !== "function") fail(name, "a function or undefined", value);
 }
 
@@ -112,10 +115,10 @@ export const resolveLocale = (locale: string, element: Element) =>
 export const unavailableDays = (
   dates: string,
   weekdays: string,
-  predicate: ((date: Date) => boolean) | undefined,
+  predicate: DatePredicate | undefined,
 ) => {
-  const dateSet = new Set(parseDates(dates) ?? []);
+  const dateSet = new Set(parseDates(dates)?.map(String));
   const weekdaySet = parseWeekdays(weekdays);
-  return (date: IsoDate) =>
-    dateSet.has(date) || weekdaySet.has(weekdayOf(date)) || (predicate?.(parseIso(date)!) ?? false);
+  return (date: PlainDate) =>
+    dateSet.has(date.toString()) || weekdaySet.has(weekdayOf(date)) || (predicate?.(date) ?? false);
 };

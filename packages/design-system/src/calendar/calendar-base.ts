@@ -16,9 +16,10 @@
  *   disallowed ↔ disallowed           unavailable dates, separated by spaces
  *   disallowedWeekdays ↔ disallowed-weekdays  unavailable weekdays (0-6)
  *   showOutsideDays ↔ show-outside-days  show the neighbouring months' days, dimmed
- *   isDateDisallowed (property only)  (date: Date) => boolean
- * Also: focusedDate, focus(), cancel().
- * Events: change (a pick completed), rangestart, focusday, pagechange ({ start, end }).
+ *   isDateDisallowed (property only)  (date: Temporal.PlainDate) => boolean
+ * Also: focusedDate ("YYYY-MM-DD"), focus(), cancel().
+ * Events: change (a pick completed), rangestart ({ date }), focusday ({ date }),
+ * pagechange ({ start, end }); dates in details are Temporal.PlainDate.
  */
 
 import { messagesFor } from "../messages.js";
@@ -36,20 +37,23 @@ import {
   resolveLocale,
   setAria,
   unavailableDays,
+  type DatePredicate,
 } from "../shared.js";
 import { CalendarPart, PartEvent, PARTS, containerOf, type CalendarContext, type FocusDetail } from "./context.js";
 import {
-  addMonths,
   clamp,
-  endOfMonth,
+  firstDayOf,
   format,
   formatRange,
-  isIsoDate,
+  isOutside,
+  lastDayOf,
   localeFirstDayOfWeek,
   monthsBetween,
-  startOfMonth,
-  todayIso,
-  type IsoDate,
+  optionalDate,
+  parseDate,
+  today,
+  type PlainDate,
+  type YearMonth,
 } from "./date.js";
 import type { Selection } from "./selection.js";
 
@@ -117,37 +121,37 @@ export abstract class CalendarBase extends HTMLElement {
     this.#render();
   }
 
-  #min: IsoDate | "" = "";
+  #min: PlainDate | null = null;
 
   get min() {
-    return this.#min;
+    return this.#min?.toString() ?? "";
   }
-  set min(value: IsoDate | "") {
-    if (accept(() => assertIsDate(value, `${this.localName}.min`))) this.#min = value;
-    reflect(this, "min", this.#min);
+  set min(value: string) {
+    if (accept(() => assertIsDate(value, `${this.localName}.min`))) this.#min = optionalDate(value);
+    reflect(this, "min", this.min);
     this.#refresh();
   }
 
-  #max: IsoDate | "" = "";
+  #max: PlainDate | null = null;
 
   get max() {
-    return this.#max;
+    return this.#max?.toString() ?? "";
   }
-  set max(value: IsoDate | "") {
-    if (accept(() => assertIsDate(value, `${this.localName}.max`))) this.#max = value;
-    reflect(this, "max", this.#max);
+  set max(value: string) {
+    if (accept(() => assertIsDate(value, `${this.localName}.max`))) this.#max = optionalDate(value);
+    reflect(this, "max", this.max);
     this.#refresh();
   }
 
-  #today: IsoDate | "" = "";
+  #today: PlainDate | null = null;
 
   /** "" = the real today */
   get today() {
-    return this.#today;
+    return this.#today?.toString() ?? "";
   }
-  set today(value: IsoDate | "") {
-    if (accept(() => assertIsDate(value, `${this.localName}.today`))) this.#today = value;
-    reflect(this, "today", this.#today);
+  set today(value: string) {
+    if (accept(() => assertIsDate(value, `${this.localName}.today`))) this.#today = optionalDate(value);
+    reflect(this, "today", this.today);
     this.#render();
   }
 
@@ -231,13 +235,13 @@ export abstract class CalendarBase extends HTMLElement {
     this.#render();
   }
 
-  #isDateDisallowed: ((date: Date) => boolean) | undefined;
+  #isDateDisallowed: DatePredicate | undefined;
 
   /** unavailable days, on top of `disallowed` and `disallowedWeekdays` (property only) */
   get isDateDisallowed() {
     return this.#isDateDisallowed;
   }
-  set isDateDisallowed(value: ((date: Date) => boolean) | undefined) {
+  set isDateDisallowed(value: DatePredicate | undefined) {
     if (accept(() => assertIsPredicate(value, `${this.localName}.isDateDisallowed`))) {
       this.#isDateDisallowed = value;
     }
@@ -249,20 +253,21 @@ export abstract class CalendarBase extends HTMLElement {
   #listeners?: AbortController;
   #id = "";
   /** the focused date (or the one that would be) */
-  #cursor: IsoDate = todayIso();
-  /** first day of the first month shown */
-  #page: IsoDate = startOfMonth(this.#cursor);
+  #cursor: PlainDate = today();
+  /** the first month shown */
+  #page: YearMonth = this.#cursor.toPlainYearMonth();
   /** range picking: the day under the pointer or focus */
-  #hover: IsoDate = this.#cursor;
+  #hover: PlainDate = this.#cursor;
 
+  /** "YYYY-MM-DD" */
   get focusedDate() {
-    return this.#cursor;
+    return this.#cursor.toString();
   }
 
   /** show and focus a date; anything but a date goes back to the selection (or today) */
   set focusedDate(date: string) {
-    this.#cursor = this.#clamp(isIsoDate(date) ? date : this.#selection.first || this.#todayOrNow);
-    this.#page = startOfMonth(this.#cursor);
+    this.#cursor = this.#clamp(parseDate(date) ?? this.#selection.first ?? this.#todayOrNow);
+    this.#page = this.#cursor.toPlainYearMonth();
     this.#render();
   }
 
@@ -308,7 +313,7 @@ export abstract class CalendarBase extends HTMLElement {
   // ---- derived state ----
 
   get #todayOrNow() {
-    return this.#today || todayIso();
+    return this.#today ?? today();
   }
 
   get #context(): CalendarContext {
@@ -317,8 +322,8 @@ export abstract class CalendarBase extends HTMLElement {
       id: this.#id,
       page: this.#page,
       cursor: this.#cursor,
-      min: this.#min || null,
-      max: this.#max || null,
+      min: this.#min,
+      max: this.#max,
       today: this.#todayOrNow,
       locale,
       messages: messagesFor(locale),
@@ -331,8 +336,8 @@ export abstract class CalendarBase extends HTMLElement {
     };
   }
 
-  #clamp(date: IsoDate) {
-    return clamp(date, this.#min || null, this.#max || null);
+  #clamp(date: PlainDate) {
+    return clamp(date, this.#min, this.#max);
   }
 
   /** min/max/months changed: keep the cursor inside, then render */
@@ -446,17 +451,17 @@ export abstract class CalendarBase extends HTMLElement {
     this.addEventListener(
       PartEvent.pick,
       (event) => {
-        if (own(event)) this.#pick((event as CustomEvent<IsoDate>).detail);
+        if (own(event)) this.#pick((event as CustomEvent<PlainDate>).detail);
       },
       { signal: this.#listeners.signal },
     );
     this.addEventListener(
       PartEvent.hover,
       (event) => {
-        const date = (event as CustomEvent<IsoDate>).detail;
+        const date = (event as CustomEvent<PlainDate>).detail;
         // only while a range is being picked, and only for a new day: a render puts a new
         // button under the pointer, which fires pointerover again
-        if (!own(event) || !this.#selection.anchor || date === this.#hover) return;
+        if (!own(event) || !this.#selection.anchor || date.equals(this.#hover)) return;
         this.#hover = date;
         this.#render();
       },
@@ -472,15 +477,18 @@ export abstract class CalendarBase extends HTMLElement {
     const keepFocus = focus ?? Boolean(active?.closest("ds-calendar-month") && this.contains(active));
 
     const context = this.#context;
-    const last = addMonths(this.#page, this.#months - 1);
+    const last = this.#page.add({ months: this.#months - 1 });
     heading.textContent =
       this.#months > 1
         ? formatRange(this.#page, last, MONTH_YEAR, context.locale)
         : format(this.#page, MONTH_YEAR, context.locale);
 
     // prev/next stay focusable at min/max (aria-disabled), so focus is never lost
-    this.#setNav("previous", context.messages.previousMonth, Boolean(context.min && this.#page <= context.min));
-    this.#setNav("next", context.messages.nextMonth, Boolean(context.max && endOfMonth(last) >= context.max));
+    // disabled when the day just before/after the page is out of range
+    const before = firstDayOf(this.#page).subtract({ days: 1 });
+    const after = lastDayOf(last).add({ days: 1 });
+    this.#setNav("previous", context.messages.previousMonth, isOutside(before, context.min, null));
+    this.#setNav("next", context.messages.nextMonth, isOutside(after, null, context.max));
 
     const status = this.#part("status");
     if (status) {
@@ -507,14 +515,14 @@ export abstract class CalendarBase extends HTMLElement {
   // ---- navigation ----
 
   /** move the cursor (clamped to min/max); `reveal` starts the page at its month */
-  #goto(date: IsoDate, reveal: boolean) {
+  #goto(date: PlainDate, reveal: boolean) {
     const cursor = this.#clamp(date);
-    if (cursor !== this.#cursor) {
+    if (!cursor.equals(this.#cursor)) {
       this.#cursor = cursor;
       this.#dispatch("focusday", { date: cursor });
     }
     this.#hover = cursor;
-    if (reveal) this.#setPage(startOfMonth(cursor));
+    if (reveal) this.#setPage(cursor.toPlainYearMonth());
     else this.#followCursor();
     // keyboard: focus the day; a select keeps the focus
     this.#render(reveal ? undefined : true);
@@ -522,28 +530,30 @@ export abstract class CalendarBase extends HTMLElement {
 
   /** turn the page so that the cursor is on it */
   #followCursor() {
-    const offset = monthsBetween(this.#page, this.#cursor);
-    if (offset < 0) this.#setPage(startOfMonth(this.#cursor));
-    else if (offset >= this.#months) this.#setPage(addMonths(startOfMonth(this.#cursor), 1 - this.#months));
+    const month = this.#cursor.toPlainYearMonth();
+    const offset = monthsBetween(this.#page, month);
+    if (offset < 0) this.#setPage(month);
+    else if (offset >= this.#months) this.#setPage(month.subtract({ months: this.#months - 1 }));
   }
 
-  #setPage(page: IsoDate) {
-    if (page === this.#page) return;
+  #setPage(page: YearMonth) {
+    if (page.equals(this.#page)) return;
     this.#page = page;
-    this.#dispatch("pagechange", { start: page, end: endOfMonth(addMonths(page, this.#months - 1)) });
+    const last = page.add({ months: this.#months - 1 });
+    this.#dispatch("pagechange", { start: firstDayOf(page), end: lastDayOf(last) });
   }
 
   /** prev/next: the day keeps its place on the new page */
   #turnPage(direction: number) {
-    this.#setPage(addMonths(this.#page, direction));
-    this.#cursor = this.#clamp(addMonths(this.#cursor, direction));
+    this.#setPage(this.#page.add({ months: direction }));
+    this.#cursor = this.#clamp(this.#cursor.add({ months: direction }));
     this.#render();
   }
 
   /** a day was picked */
-  #pick(date: IsoDate) {
+  #pick(date: PlainDate) {
     const { min, max, isDisallowed } = this.#context;
-    if ((min && date < min) || (max && date > max)) return;
+    if (isOutside(date, min, max)) return;
     // unavailable: it can be focused, not picked
     if (isDisallowed(date)) {
       this.#goto(date, false);

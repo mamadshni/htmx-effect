@@ -3,56 +3,26 @@ import { createRequire } from "node:module";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NodeHttpServer, NodeRuntime } from "@effect/platform-node";
-import { Effect, Layer } from "effect";
+import { Layer } from "effect";
 import { HttpRouter, HttpServerResponse, HttpStaticServer } from "effect/http";
-import { toHtml } from "tsx-to-html";
-import { Page, SearchOptions } from "./views.js";
+import { CalendarRoutes } from "./calendar/routes.js";
+import { CompareRoutes } from "./compare/routes.js";
+import { HomeRoutes } from "./home/routes.js";
+import { RangePickerRoutes } from "./range-picker/routes.js";
 
 const require = createRequire(import.meta.url);
 
-const fruits = [
-  "Apple",
-  "Apricot",
-  "Banana",
-  "Blueberry",
-  "Cherry",
-  "Grape",
-  "Lemon",
-  "Mango",
-  "Orange",
-  "Peach",
-  "Pear",
-  "Strawberry",
-];
-
-const startingItems = fruits.slice(0, 5);
-
-const Routes = Layer.mergeAll(
-  HttpRouter.add(
-    "GET",
-    "/",
-    HttpServerResponse.html(
-      `<!doctype html>${toHtml(<Page items={startingItems} />)}`,
-    ),
-  ),
-  HttpRouter.add("GET", "/search-options", (request) =>
-    Effect.sync(() => {
-      const q = (new URL(request.url, "http://localhost").searchParams.get("q") ?? "")
-        .trim()
-        .toLowerCase();
-      const items = q
-        ? fruits.filter((f) => f.toLowerCase().includes(q))
-        : startingItems;
-      const selected = items.find((f) => f.toLowerCase() === q);
-      return HttpServerResponse.html(
-        toHtml(<SearchOptions items={items} selected={selected} />),
-      );
-    }),
-  ),
+/** scripts and styles: htmx, cally, the app's own, and the design system's bundle */
+const Assets = Layer.mergeAll(
   HttpRouter.add(
     "GET",
     "/assets/htmx.js",
     HttpServerResponse.file(require.resolve("htmx.org/dist/htmx.min.js")),
+  ),
+  HttpRouter.add(
+    "GET",
+    "/assets/cally.js",
+    HttpServerResponse.file(fileURLToPath(import.meta.resolve("cally"))),
   ),
   HttpStaticServer.layer({
     root: fileURLToPath(new URL("../public", import.meta.url)),
@@ -66,7 +36,9 @@ const Routes = Layer.mergeAll(
   }),
 );
 
-HttpRouter.serve(Routes).pipe(
+HttpRouter.serve(
+  Layer.mergeAll(HomeRoutes, CalendarRoutes, CompareRoutes, RangePickerRoutes, Assets),
+).pipe(
   Layer.provide(NodeHttpServer.layer(createServer, { port: Number(process.env.PORT ?? 3000) })),
   Layer.launch,
   NodeRuntime.runMain,

@@ -10,7 +10,7 @@ import type { Messages } from "../messages.js";
 import { accept, assertIsInteger, define, reflect } from "../shared.js";
 import { CalendarSelect } from "./calendar-select.js";
 import type { CalendarContext } from "./context.js";
-import { daysInMonth, format, fromParts, partsOf } from "./date.js";
+import { format } from "./date.js";
 
 namespace Module {
   export const tagName = "ds-calendar-select-year" as const;
@@ -48,16 +48,16 @@ namespace Module {
     }
 
     protected options({ cursor, min, max, locale }: CalendarContext) {
-      const { year: current, month, day } = partsOf(cursor);
       const half = Math.floor(this.#maxYears / 2);
-      const first = Math.max(current - half, min ? partsOf(min).year : -Infinity);
-      const last = Math.min(first + this.#maxYears - 1, max ? partsOf(max).year : Infinity);
+      const first = Math.max(cursor.year - half, min?.year ?? -Infinity);
+      const last = Math.min(first + this.#maxYears - 1, max?.year ?? Infinity);
       return Array.from({ length: last - first + 1 }, (_, i) => {
-        const year = first + i;
+        // the cursor's day in that year (29 February → 28 February)
+        const date = cursor.with({ year: first + i });
         return {
-          date: fromParts(year, month, Math.min(day, daysInMonth(year, month))),
-          label: format(fromParts(year, 0, 1), { year: "numeric" }, locale),
-          selected: year === current,
+          date,
+          label: format(date, { year: "numeric" }, locale),
+          selected: date.year === cursor.year,
           disabled: false,
         };
       });

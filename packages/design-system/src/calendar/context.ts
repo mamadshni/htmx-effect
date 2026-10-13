@@ -7,7 +7,7 @@
  */
 
 import type { Messages } from "../messages.js";
-import type { IsoDate } from "./date.js";
+import type { PlainDate, YearMonth } from "./date.js";
 import type { SelectionState } from "./selection.js";
 
 export const CONTAINERS = "ds-calendar, ds-calendar-range, ds-calendar-multi";
@@ -16,13 +16,13 @@ export const PARTS = "ds-calendar-month, ds-calendar-select-month, ds-calendar-s
 export interface CalendarContext {
   /** the container's id, to derive ids for labels */
   readonly id: string;
-  /** first day of the first month shown */
-  readonly page: IsoDate;
+  /** the first month shown */
+  readonly page: YearMonth;
   /** the focused date */
-  readonly cursor: IsoDate;
-  readonly min: IsoDate | null;
-  readonly max: IsoDate | null;
-  readonly today: IsoDate;
+  readonly cursor: PlainDate;
+  readonly min: PlainDate | null;
+  readonly max: PlainDate | null;
+  readonly today: PlainDate;
   readonly locale: string;
   readonly messages: Messages;
   /** 0 = Sunday … 6 = Saturday */
@@ -30,9 +30,9 @@ export interface CalendarContext {
   readonly showOutsideDays: boolean;
   readonly selection: SelectionState;
   /** range picking: the first picked day and the day under the pointer/focus */
-  readonly anchor: IsoDate | "";
-  readonly hover: IsoDate;
-  isDisallowed(date: IsoDate): boolean;
+  readonly anchor: PlainDate | null;
+  readonly hover: PlainDate;
+  isDisallowed(date: PlainDate): boolean;
 }
 
 /** what parts send up (internal: the containers turn them into public events) */
@@ -46,7 +46,7 @@ export const PartEvent = {
 } as const;
 
 export interface FocusDetail {
-  date: IsoDate;
+  date: PlainDate;
   reveal?: boolean;
 }
 

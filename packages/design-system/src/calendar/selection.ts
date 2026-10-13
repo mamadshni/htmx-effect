@@ -1,4 +1,4 @@
-import { isIsoDate, parseDates, parseRange, type IsoDate } from "./date.js";
+import { isAfter, isBefore, parseDate, parseDates, parseRange, Temporal, type PlainDate } from "./date.js";
 
 export const selectionModes = ["single", "range", "multiple"] as const;
 
@@ -6,12 +6,10 @@ export type SelectionMode = (typeof selectionModes)[number];
 
 /** what views need to know to mark selected cells */
 export interface SelectionState {
-  includes(date: IsoDate): boolean;
-  /** does any selected day fall inside [start, end]? */
-  overlaps(start: IsoDate, end: IsoDate): boolean;
+  includes(date: PlainDate): boolean;
   /** first / last day of a range */
-  isStart(date: IsoDate): boolean;
-  isEnd(date: IsoDate): boolean;
+  isStart(date: PlainDate): boolean;
+  isEnd(date: PlainDate): boolean;
 }
 
 /**
@@ -21,33 +19,33 @@ export interface SelectionState {
 export abstract class Selection implements SelectionState {
   abstract readonly mode: SelectionMode;
   /** sorted, without duplicates */
-  protected dates: IsoDate[] = [];
+  protected dates: PlainDate[] = [];
 
   /** the value as written in the `value` attribute and sent with forms */
   abstract get value(): string;
 
   /** parse a value or typed text; undefined when it is not valid for this mode */
-  abstract parse(text: string): IsoDate[] | undefined;
+  abstract parse(text: string): PlainDate[] | undefined;
 
   /** a day was picked; true when the selection is complete */
-  abstract pick(date: IsoDate): boolean;
+  abstract pick(date: PlainDate): boolean;
 
   /** the current step, for modes that pick in steps */
   get step(): "start" | "end" | undefined {
     return undefined;
   }
 
-  /** the first day of an unfinished pick, else "" */
-  get anchor(): IsoDate | "" {
-    return "";
+  /** the first day of an unfinished pick */
+  get anchor(): PlainDate | null {
+    return null;
   }
 
-  get first(): IsoDate | "" {
-    return this.dates[0] ?? "";
+  get first(): PlainDate | null {
+    return this.dates[0] ?? null;
   }
 
-  get last(): IsoDate | "" {
-    return this.dates.at(-1) ?? "";
+  get last(): PlainDate | null {
+    return this.dates.at(-1) ?? null;
   }
 
   /** set from a value; an invalid value clears the selection (like native inputs) */
@@ -59,19 +57,15 @@ export abstract class Selection implements SelectionState {
   /** drop an unfinished pick */
   cancel() {}
 
-  includes(date: IsoDate) {
-    return this.dates.includes(date);
+  includes(date: PlainDate) {
+    return this.dates.some((selected) => selected.equals(date));
   }
 
-  overlaps(start: IsoDate, end: IsoDate) {
-    return this.dates.some((date) => date >= start && date <= end);
-  }
-
-  isStart(_date: IsoDate) {
+  isStart(_date: PlainDate) {
     return false;
   }
 
-  isEnd(_date: IsoDate) {
+  isEnd(_date: PlainDate) {
     return false;
   }
 }
@@ -81,16 +75,17 @@ export class SingleSelection extends Selection {
   readonly mode = "single";
 
   get value() {
-    return this.first;
+    return this.first?.toString() ?? "";
   }
 
   parse(text: string) {
     const value = text.trim();
     if (!value) return [];
-    return isIsoDate(value) ? [value] : undefined;
+    const date = parseDate(value);
+    return date ? [date] : undefined;
   }
 
-  pick(date: IsoDate) {
+  pick(date: PlainDate) {
     this.dates = [date];
     return true;
   }
@@ -99,10 +94,10 @@ export class SingleSelection extends Selection {
 /** a start and an end: "YYYY-MM-DD/YYYY-MM-DD" (ISO 8601 interval), picked in two steps */
 export class RangeSelection extends Selection {
   readonly mode = "range";
-  #anchor: IsoDate | "" = "";
+  #anchor: PlainDate | null = null;
 
   get value() {
-    return this.first ? `${this.first}/${this.last}` : "";
+    return this.first && this.last ? `${this.first}/${this.last}` : "";
   }
 
   get step() {
@@ -117,34 +112,30 @@ export class RangeSelection extends Selection {
     return text.trim() ? parseRange(text) : [];
   }
 
-  pick(date: IsoDate) {
+  pick(date: PlainDate) {
     if (!this.#anchor) {
       this.#anchor = date;
       return false;
     }
-    this.dates = this.#anchor <= date ? [this.#anchor, date] : [date, this.#anchor];
-    this.#anchor = "";
+    this.dates = isAfter(this.#anchor, date) ? [date, this.#anchor] : [this.#anchor, date];
+    this.#anchor = null;
     return true;
   }
 
   cancel() {
-    this.#anchor = "";
+    this.#anchor = null;
   }
 
-  includes(date: IsoDate) {
-    return Boolean(this.first) && date >= this.first && date <= this.last;
+  includes(date: PlainDate) {
+    return Boolean(this.first && this.last && !isBefore(date, this.first) && !isAfter(date, this.last));
   }
 
-  overlaps(start: IsoDate, end: IsoDate) {
-    return Boolean(this.first) && this.first <= end && this.last >= start;
+  isStart(date: PlainDate) {
+    return this.first?.equals(date) ?? false;
   }
 
-  isStart(date: IsoDate) {
-    return date === this.first;
-  }
-
-  isEnd(date: IsoDate) {
-    return date === this.last;
+  isEnd(date: PlainDate) {
+    return this.last?.equals(date) ?? false;
   }
 }
 
@@ -160,10 +151,10 @@ export class MultiSelection extends Selection {
     return parseDates(text);
   }
 
-  pick(date: IsoDate) {
+  pick(date: PlainDate) {
     this.dates = this.includes(date)
-      ? this.dates.filter((d) => d !== date)
-      : [...this.dates, date].sort();
+      ? this.dates.filter((selected) => !selected.equals(date))
+      : [...this.dates, date].sort(Temporal.PlainDate.compare);
     return true;
   }
 }

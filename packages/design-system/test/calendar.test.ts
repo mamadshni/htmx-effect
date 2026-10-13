@@ -63,6 +63,17 @@ describe("calendar containers and parts", () => {
     expect(events.find((e) => e.type === "pagechange")?.detail).toEqual({ start: "2026-11-01", end: "2026-11-30" });
   });
 
+  it("keeps the day when paging, clamped to the month's length", async () => {
+    await mount(`<ds-calendar ${attributes} value="2026-01-31"><ds-calendar-month></ds-calendar-month></ds-calendar>`);
+    $("ds-calendar").focus();
+    await userEvent.keyboard("{PageDown}");
+    expect(focusedDate()).toBe("2026-02-28");
+    $("ds-calendar").focusedDate = "2028-02-29";
+    $("ds-calendar").focus();
+    await userEvent.keyboard("{Shift>}{PageDown}{/Shift}");
+    expect(focusedDate()).toBe("2029-02-28");
+  });
+
   it("keeps focus inside min/max and marks prev/next", async () => {
     await mount(`<ds-calendar ${attributes} show-outside-days value="2026-10-02" min="2026-10-01" max="2026-10-31"></ds-calendar>`);
     expect($<HTMLButtonElement>('button[data-date="2026-09-30"]').disabled).toBe(true);
@@ -102,7 +113,7 @@ describe("calendar containers and parts", () => {
     expect(status()).toBe("Select start date");
 
     await userEvent.click(day("2026-10-20"));
-    expect(events.map((e) => e.type)).toEqual(["rangestart"]);
+    expect(events).toEqual([{ type: "rangestart", detail: { date: "2026-10-20" } }]);
     expect(status()).toBe("Select end date");
     await userEvent.hover(day("2026-10-16"));
     expect(day("2026-10-18").hasAttribute("data-preview")).toBe(true);
@@ -125,7 +136,7 @@ describe("calendar containers and parts", () => {
 
   it("does not pick unavailable days (attributes and property)", async () => {
     const root = await mount(`<ds-calendar ${attributes} disallowed="2026-10-15" disallowed-weekdays="0 6"></ds-calendar>`);
-    $("ds-calendar").isDateDisallowed = (date) => date.getUTCDate() === 22;
+    $("ds-calendar").isDateDisallowed = (date) => date.day === 22;
     const events = record(root, "change");
 
     for (const date of ["2026-10-15", "2026-10-17", "2026-10-18", "2026-10-22"]) {

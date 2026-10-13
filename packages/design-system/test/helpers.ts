@@ -17,11 +17,14 @@ export function $(selector: string) {
   return element;
 }
 
-/** the events of the given types fired on (or bubbling to) a target */
+/** the events of the given types fired on (or bubbling to) a target; details as JSON (dates as "YYYY-MM-DD") */
 export const record = (target: EventTarget, ...types: string[]) => {
   const events: { type: string; detail: unknown }[] = [];
   for (const type of types) {
-    target.addEventListener(type, (event) => events.push({ type, detail: (event as CustomEvent).detail }));
+    target.addEventListener(type, (event) => {
+      const detail = (event as CustomEvent).detail as unknown;
+      events.push({ type, detail: detail === undefined ? undefined : JSON.parse(JSON.stringify(detail)) });
+    });
   }
   return events;
 };

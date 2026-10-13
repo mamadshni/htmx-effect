@@ -14,8 +14,10 @@
  *   name, required, disabled, range ↔ same names
  *   min, max, today, months, locale, firstDayOfWeek, disallowed, disallowedWeekdays,
  *   isDateDisallowed                  as on <ds-calendar>, passed on to it
+ *                                     (isDateDisallowed: (date: Temporal.PlainDate) => boolean)
  *
- * - `start` and `end` expose the two ends (equal for a single date).
+ * - `start` and `end` expose the two ends as Temporal.PlainDate (equal for a single date; null
+ *   when empty).
  * - The native <input type="date"> is used only on touch-first devices (`pointer: coarse`)
  *   and only when it can do everything asked for: ranges and unavailable days always get
  *   the calendar.
@@ -32,7 +34,7 @@ import "../calendar/calendar-range.js";
 import "../calendar/calendar-select-month.js";
 import "../calendar/calendar-select-year.js";
 import type { CalendarBase } from "../calendar/calendar-base.js";
-import { format, type IsoDate } from "../calendar/date.js";
+import { format, isOutside, optionalDate, type PlainDate } from "../calendar/date.js";
 import { createSelection, type Selection } from "../calendar/selection.js";
 import { messagesFor } from "../messages.js";
 import {
@@ -49,6 +51,7 @@ import {
   reflect,
   resolveLocale,
   unavailableDays,
+  type DatePredicate,
   type Listen,
 } from "../shared.js";
 
@@ -144,10 +147,12 @@ namespace Module {
       this.#setValue(value);
     }
 
+    /** the first day of the value, or null */
     get start() {
       return this.#selection.first;
     }
 
+    /** the last day of the value (the start for a single date), or null */
     get end() {
       return this.#selection.last;
     }
@@ -204,36 +209,36 @@ namespace Module {
       this.#rerender();
     }
 
-    #min: IsoDate | "" = "";
+    #min: PlainDate | null = null;
 
     get min() {
-      return this.#min;
+      return this.#min?.toString() ?? "";
     }
-    set min(value: IsoDate | "") {
-      if (accept(() => assertIsDate(value, `${tagName}.min`))) this.#min = value;
-      reflect(this, "min", this.#min);
+    set min(value: string) {
+      if (accept(() => assertIsDate(value, `${tagName}.min`))) this.#min = optionalDate(value);
+      reflect(this, "min", this.min);
       this.#syncAll();
     }
 
-    #max: IsoDate | "" = "";
+    #max: PlainDate | null = null;
 
     get max() {
-      return this.#max;
+      return this.#max?.toString() ?? "";
     }
-    set max(value: IsoDate | "") {
-      if (accept(() => assertIsDate(value, `${tagName}.max`))) this.#max = value;
-      reflect(this, "max", this.#max);
+    set max(value: string) {
+      if (accept(() => assertIsDate(value, `${tagName}.max`))) this.#max = optionalDate(value);
+      reflect(this, "max", this.max);
       this.#syncAll();
     }
 
-    #today: IsoDate | "" = "";
+    #today: PlainDate | null = null;
 
     get today() {
-      return this.#today;
+      return this.#today?.toString() ?? "";
     }
-    set today(value: IsoDate | "") {
-      if (accept(() => assertIsDate(value, `${tagName}.today`))) this.#today = value;
-      reflect(this, "today", this.#today);
+    set today(value: string) {
+      if (accept(() => assertIsDate(value, `${tagName}.today`))) this.#today = optionalDate(value);
+      reflect(this, "today", this.today);
       this.#syncCalendar();
     }
 
@@ -299,13 +304,13 @@ namespace Module {
       this.#availabilityChanged();
     }
 
-    #isDateDisallowed: ((date: Date) => boolean) | undefined;
+    #isDateDisallowed: DatePredicate | undefined;
 
     /** unavailable days, on top of `disallowed` and `disallowedWeekdays` (property only) */
     get isDateDisallowed() {
       return this.#isDateDisallowed;
     }
-    set isDateDisallowed(value: ((date: Date) => boolean) | undefined) {
+    set isDateDisallowed(value: DatePredicate | undefined) {
       if (accept(() => assertIsPredicate(value, `${tagName}.isDateDisallowed`))) {
         this.#isDateDisallowed = value;
       }
@@ -437,7 +442,7 @@ namespace Module {
     /** the selection as shown in the text input */
     get #text() {
       const { first, last } = this.#selection;
-      return this.#range && first ? `${first} – ${last}` : first;
+      return this.#range && first ? `${first} – ${last}` : (first?.toString() ?? "");
     }
 
     // ---- rendering ----
@@ -600,7 +605,7 @@ namespace Module {
 
       const input = this.#input;
       if (input && !keepText) {
-        const text = input.type === "date" ? this.#selection.first : this.#text;
+        const text = input.type === "date" ? (this.#selection.first?.toString() ?? "") : this.#text;
         if (input.value !== text) input.value = text;
       }
       this.#validate();
@@ -611,20 +616,20 @@ namespace Module {
       const { first, last } = this.#selection;
       const messages = this.#messages;
       const range = this.#range;
-      const date = (iso: string) => format(iso, FULL_DATE, this.#resolvedLocale);
-      const unavailable = first
-        ? unavailableDays(this.#disallowed, this.#disallowedWeekdays, this.#isDateDisallowed)
-        : undefined;
+      const date = (day: PlainDate) => format(day, FULL_DATE, this.#resolvedLocale);
+      const unavailable = unavailableDays(this.#disallowed, this.#disallowedWeekdays, this.#isDateDisallowed);
 
       const [flag, message]: [keyof ValidityStateFlags, string] | [] = this.#badInput
         ? ["badInput", (range ? messages.badInputRange : messages.badInput)(this.#pattern)]
-        : this.#required && !first
-          ? ["valueMissing", range ? messages.valueMissingRange : messages.valueMissing]
-          : first && this.#min && first < this.#min
+        : !first || !last
+          ? this.#required
+            ? ["valueMissing", range ? messages.valueMissingRange : messages.valueMissing]
+            : []
+          : this.#min && isOutside(first, this.#min, null)
             ? ["rangeUnderflow", messages.rangeUnderflow(date(this.#min))]
-            : last && this.#max && last > this.#max
+            : this.#max && isOutside(last, null, this.#max)
               ? ["rangeOverflow", messages.rangeOverflow(date(this.#max))]
-              : unavailable && (unavailable(first) || unavailable(last))
+              : unavailable(first) || unavailable(last)
                 ? ["customError", messages.unavailable]
                 : [];
 
@@ -651,8 +656,8 @@ namespace Module {
       input.setAttribute("aria-required", String(this.#required));
       if (input.type === "date") {
         // limits for the native picker; validity itself is reported by the host
-        input.min = this.#min;
-        input.max = this.#max;
+        input.min = this.min;
+        input.max = this.max;
       }
     }
 
@@ -660,9 +665,9 @@ namespace Module {
     #syncCalendar() {
       const calendar = this.#calendar;
       if (!calendar) return;
-      calendar.min = this.#min;
-      calendar.max = this.#max;
-      calendar.today = this.#today;
+      calendar.min = this.min;
+      calendar.max = this.max;
+      calendar.today = this.today;
       calendar.months = this.#months;
       calendar.locale = this.#locale;
       calendar.firstDayOfWeek = this.#firstDayOfWeek;

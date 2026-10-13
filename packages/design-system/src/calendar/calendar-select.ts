@@ -1,10 +1,10 @@
 import type { Messages } from "../messages.js";
 import { CalendarPart, PartEvent, type CalendarContext } from "./context.js";
-import type { IsoDate } from "./date.js";
+import { parseDate, type PlainDate } from "./date.js";
 
 export interface SelectOption {
   /** the date to go to (the cursor's day, in that month or year) */
-  readonly date: IsoDate;
+  readonly date: PlainDate;
   readonly label: string;
   readonly selected: boolean;
   readonly disabled: boolean;
@@ -45,7 +45,8 @@ export abstract class CalendarSelect extends CalendarPart {
     this.#select.addEventListener("input", (event) => event.stopPropagation());
     this.#select.addEventListener("change", (event) => {
       event.stopPropagation();
-      this.send(PartEvent.focus, { date: this.#select!.value, reveal: true });
+      const date = parseDate(this.#select!.value);
+      if (date) this.send(PartEvent.focus, { date, reveal: true });
     });
   }
 }

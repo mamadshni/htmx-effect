@@ -76,7 +76,7 @@ describe("ds-date-picker", () => {
     await userEvent.click(day("2026-11-03"));
     await userEvent.click(day("2026-10-28"));
     expect(picker().value).toBe("2026-10-28/2026-11-03");
-    expect([picker().start, picker().end]).toEqual(["2026-10-28", "2026-11-03"]);
+    expect([picker().start?.toString(), picker().end?.toString()]).toEqual(["2026-10-28", "2026-11-03"]);
     expect(input().value).toBe("2026-10-28 – 2026-11-03");
     expect(new FormData($("form")).get("due")).toBe("2026-10-28/2026-11-03");
   });

@@ -1,0 +1,301 @@
+/* <app-range-picker>: the field, the popover (presets | calendar + footer) and a theme for cally. */
+
+app-range-picker {
+  --rp-text: #1f2328;
+  --rp-muted: #b4b9bf;
+  --rp-border: #e3e6ea;
+  --rp-soft: #f2f3f5;
+  --rp-accent: #111;
+  --rp-focus: #60a5fa;
+  display: inline-block;
+}
+
+.app-range-picker__hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---- field ---- */
+
+.app-range-picker__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-inline-size: 14rem;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  color: var(--rp-text);
+  text-align: start;
+  background: #fff;
+  border: 1px solid var(--rp-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.app-range-picker__trigger:hover {
+  border-color: #c9ced4;
+}
+
+.app-range-picker__trigger:focus-visible {
+  outline: 2px solid var(--rp-focus);
+  outline-offset: 2px;
+}
+
+.app-range-picker__label[data-placeholder] {
+  color: #6b7280;
+}
+
+/* ---- popover ---- */
+
+.app-range-picker__dialog:popover-open {
+  display: grid;
+  grid-template-columns: auto 1fr;
+}
+
+.app-range-picker__dialog {
+  position-area: block-end span-inline-end;
+  /* its full size, so a lack of room flips it instead of squeezing the months */
+  inline-size: max-content;
+  position-try-fallbacks: flip-inline, flip-block, flip-block flip-inline;
+  margin: 0.5rem 0;
+  padding: 0;
+  color: var(--rp-text);
+  background: #fff;
+  border: 1px solid var(--rp-border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.12);
+}
+
+.app-range-picker__presets {
+  display: grid;
+  align-content: start;
+  gap: 0.15rem;
+  min-inline-size: 10rem;
+  margin: 0;
+  padding: 0.75rem;
+  list-style: none;
+  border-inline-end: 1px solid var(--rp-border);
+}
+
+.app-range-picker__presets button {
+  inline-size: 100%;
+  padding: 0.55rem 0.9rem;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.app-range-picker__presets button:hover {
+  background: var(--rp-soft);
+}
+
+.app-range-picker__presets button[aria-pressed="true"] {
+  background: #ebedf0;
+}
+
+.app-range-picker__presets button:focus-visible {
+  outline: 2px solid var(--rp-focus);
+  outline-offset: -2px;
+}
+
+.app-range-picker__main {
+  display: grid;
+  grid-template-rows: 1fr auto;
+}
+
+.app-range-picker__calendar {
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+.app-range-picker__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-block-start: 1px solid var(--rp-border);
+}
+
+.app-range-picker__footer button {
+  padding: 0.55rem 1.1rem;
+  font: inherit;
+  font-weight: 500;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.app-range-picker__cancel {
+  color: inherit;
+  background: none;
+}
+
+.app-range-picker__cancel:hover {
+  background: var(--rp-soft);
+}
+
+.app-range-picker__apply {
+  color: #fff;
+  background: var(--rp-accent);
+}
+
+.app-range-picker__apply:hover {
+  background: #333;
+}
+
+.app-range-picker__footer button:focus-visible {
+  outline: 2px solid var(--rp-focus);
+  outline-offset: 2px;
+}
+
+/* ---- cally: months side by side, our titles, arrows in the top corners ---- */
+
+app-range-picker calendar-range {
+  position: relative;
+  display: block;
+}
+
+app-range-picker calendar-range::part(header) {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 0;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+/* cally's heading is a year range; the months carry "August 2026" instead */
+app-range-picker calendar-range::part(heading) {
+  visibility: hidden;
+}
+
+app-range-picker calendar-range::part(button) {
+  display: grid;
+  place-items: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  padding: 0;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+app-range-picker calendar-range::part(button):hover {
+  background: var(--rp-soft);
+}
+
+app-range-picker calendar-range::part(disabled) {
+  color: var(--rp-muted);
+  cursor: default;
+}
+
+app-range-picker calendar-range::part(disabled):hover {
+  background: none;
+}
+
+.app-range-picker__months {
+  display: flex;
+  gap: 2.5rem;
+}
+
+/* small screens: the popover takes the width, months stack */
+@media (max-width: 52rem) {
+  .app-range-picker__dialog {
+    position-area: block-end;
+    inline-size: auto;
+    max-inline-size: calc(100vw - 1rem);
+  }
+
+  .app-range-picker__months {
+    flex-wrap: wrap;
+  }
+}
+
+.app-range-picker__month-title {
+  display: grid;
+  place-items: center;
+  block-size: 2rem;
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+app-range-picker calendar-month {
+  --color-accent: var(--rp-accent);
+  --color-text-on-accent: #fff;
+  font-size: 1rem;
+}
+
+/* cally's month heading (no year) still labels the table, just not shown */
+app-range-picker calendar-month::part(heading) {
+  display: none;
+}
+
+app-range-picker calendar-month::part(th) {
+  inline-size: 2.5rem;
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: #6b7280;
+}
+
+app-range-picker calendar-month::part(button) {
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  font-size: 1rem;
+  border-radius: 8px;
+}
+
+/* neighbouring days look like any other (only the future is dimmed) */
+app-range-picker calendar-month::part(outside) {
+  opacity: 1;
+}
+
+app-range-picker calendar-month::part(disabled),
+app-range-picker calendar-month::part(future) {
+  color: var(--rp-muted);
+  opacity: 1;
+}
+
+app-range-picker calendar-month::part(range-inner) {
+  color: inherit;
+  background: var(--rp-soft);
+  border-radius: 0;
+}
+
+app-range-picker calendar-month::part(selected range-start),
+app-range-picker calendar-month::part(selected range-end) {
+  color: #fff;
+  background: var(--rp-accent);
+}
+
+app-range-picker calendar-month::part(button):focus-visible {
+  outline: 2px solid var(--rp-focus);
+  outline-offset: 1px;
+}
+
+/* cally fills any focused day with the accent; here only the range ends are filled */
+app-range-picker calendar-month::part(button):focus-visible {
+  color: inherit;
+  background: transparent;
+}
+
+app-range-picker calendar-month::part(range-inner):focus-visible {
+  background: var(--rp-soft);
+}
+
+app-range-picker calendar-month::part(range-start):focus-visible,
+app-range-picker calendar-month::part(range-end):focus-visible {
+  color: #fff;
+  background: var(--rp-accent);
+}

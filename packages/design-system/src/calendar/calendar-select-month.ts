@@ -13,7 +13,7 @@ import type { Messages } from "../messages.js";
 import { define } from "../shared.js";
 import { CalendarSelect } from "./calendar-select.js";
 import type { CalendarContext } from "./context.js";
-import { daysInMonth, endOfMonth, format, fromParts, overlaps, partsOf } from "./date.js";
+import { format, isMonthOutside } from "./date.js";
 
 namespace Module {
   export const tagName = "ds-calendar-select-month" as const;
@@ -24,14 +24,14 @@ namespace Module {
     }
 
     protected options({ cursor, min, max, locale }: CalendarContext) {
-      const { year, month: current, day } = partsOf(cursor);
-      return Array.from({ length: 12 }, (_, month) => {
-        const first = fromParts(year, month, 1);
+      return Array.from({ length: cursor.monthsInYear }, (_, i) => {
+        // the cursor's day in that month (clamped to its length: 31 → 30)
+        const date = cursor.with({ month: i + 1 });
         return {
-          date: fromParts(year, month, Math.min(day, daysInMonth(year, month))),
-          label: format(first, { month: "long" }, locale),
-          selected: month === current,
-          disabled: !overlaps(first, endOfMonth(first), min, max),
+          date,
+          label: format(date, { month: "long" }, locale),
+          selected: date.month === cursor.month,
+          disabled: isMonthOutside(date.toPlainYearMonth(), min, max),
         };
       });
     }

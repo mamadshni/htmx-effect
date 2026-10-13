@@ -1,102 +1,57 @@
 /**
- * Pure helpers for ISO dates (YYYY-MM-DD). All math is done in UTC so local
- * daylight-saving changes never shift a day.
+ * Date helpers on Temporal (the @js-temporal/polyfill): a day is a Temporal.PlainDate, a
+ * month a Temporal.PlainYearMonth. No time zones, no Date: a day is just a day.
+ *
+ * Strings ("YYYY-MM-DD") only exist at the edges: attributes, form values and typed text.
  */
 
-export type IsoDate = string;
+import { Intl as TemporalIntl, Temporal } from "@js-temporal/polyfill";
 
-const DAY_MS = 86_400_000;
+export { Temporal };
 
-const pad = (n: number) => String(n).padStart(2, "0");
+export type PlainDate = Temporal.PlainDate;
+export type YearMonth = Temporal.PlainYearMonth;
 
-export const toIso = (date: Date): IsoDate =>
-  `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+// ---- parsing (strict: exactly YYYY-MM-DD, a real day) ----
 
-export const fromParts = (year: number, month: number, day: number): IsoDate =>
-  toIso(new Date(Date.UTC(year, month, day)));
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** the Date for a valid ISO date, undefined otherwise (rejects e.g. 2026-02-30) */
-export const parseIso = (value: string) => {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return undefined;
-  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
-  return toIso(date) === value ? date : undefined;
+/** the day for "YYYY-MM-DD", undefined for anything else (e.g. 2026-02-30 or 2026-10-12T10:00) */
+export const parseDate = (value: string): PlainDate | undefined => {
+  if (!ISO_DATE.test(value)) return undefined;
+  try {
+    return Temporal.PlainDate.from(value, { overflow: "reject" });
+  } catch {
+    return undefined;
+  }
 };
 
-export const isIsoDate = (value: string): value is IsoDate => parseIso(value) !== undefined;
+export const isIsoDate = (value: string) => parseDate(value) !== undefined;
 
-/** year, month (0-11), day of a valid ISO date */
-export const partsOf = (iso: IsoDate) => {
-  const date = parseIso(iso)!;
-  return { year: date.getUTCFullYear(), month: date.getUTCMonth(), day: date.getUTCDate() };
-};
+/** "" or a valid date → the day or null (for inputs that were already checked) */
+export const optionalDate = (value: string) => parseDate(value) ?? null;
 
-/** 0 = Sunday … 6 = Saturday */
-export const weekdayOf = (iso: IsoDate) => parseIso(iso)!.getUTCDay();
-
-export const todayIso = (): IsoDate => {
-  const now = new Date();
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-};
-
-export const daysInMonth = (year: number, month: number) =>
-  new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-
-export const startOfMonth = (iso: IsoDate) => {
-  const { year, month } = partsOf(iso);
-  return fromParts(year, month, 1);
-};
-
-export const endOfMonth = (iso: IsoDate) => {
-  const { year, month } = partsOf(iso);
-  return fromParts(year, month, daysInMonth(year, month));
-};
-
-/** whole months from a to b (a's month to b's month) */
-export const monthsBetween = (a: IsoDate, b: IsoDate) => {
-  const from = partsOf(a);
-  const to = partsOf(b);
-  return (to.year - from.year) * 12 + to.month - from.month;
-};
-
-export const addDays = (iso: IsoDate, days: number) =>
-  toIso(new Date(parseIso(iso)!.getTime() + days * DAY_MS));
-
-/** keeps the day of month, clamped to the target month's length */
-export const addMonths = (iso: IsoDate, months: number) => {
-  const { year, month, day } = partsOf(iso);
-  const target = new Date(Date.UTC(year, month + months, 1));
-  const lastDay = daysInMonth(target.getUTCFullYear(), target.getUTCMonth());
-  return fromParts(target.getUTCFullYear(), target.getUTCMonth(), Math.min(day, lastDay));
-};
-
-export const addYears = (iso: IsoDate, years: number) => addMonths(iso, years * 12);
-
-/** does any day of [start, end] fall inside [min, max]? (ISO strings compare correctly) */
-export const overlaps = (start: IsoDate, end: IsoDate, min: IsoDate | null, max: IsoDate | null) =>
-  !(min && end < min) && !(max && start > max);
-
-export const clamp = (iso: IsoDate, min: IsoDate | null, max: IsoDate | null) =>
-  min && iso < min ? min : max && iso > max ? max : iso;
+/** sorted, without duplicates */
+const sortedUnique = (dates: PlainDate[]) =>
+  [...new Map(dates.map((date) => [date.toString(), date])).values()].sort(Temporal.PlainDate.compare);
 
 /**
  * a typed date or date range: "2026-10-01", "2026-10-01/2026-10-05" (ISO 8601 interval),
  * "2026-10-01 – 2026-10-05" or "2026-10-01 - 2026-10-05"; ends are sorted.
  * Returns undefined for anything else.
  */
-export const parseRange = (text: string): [IsoDate, IsoDate] | undefined => {
+export const parseRange = (text: string): [PlainDate, PlainDate] | undefined => {
   const match = /^\s*(\d{4}-\d{2}-\d{2})\s*(?:(?:\/|–|—|\s-\s)\s*(\d{4}-\d{2}-\d{2}))?\s*$/.exec(text);
-  const start = match?.[1];
-  const end = match?.[2] ?? start;
-  if (!start || !end || !isIsoDate(start) || !isIsoDate(end)) return undefined;
-  return start <= end ? [start, end] : [end, start];
+  const start = match?.[1] ? parseDate(match[1]) : undefined;
+  const end = match?.[2] ? parseDate(match[2]) : start;
+  if (!start || !end) return undefined;
+  return isAfter(start, end) ? [end, start] : [start, end];
 };
 
-/** a list of dates separated by spaces or commas: sorted, without duplicates; undefined if any is invalid */
-export const parseDates = (text: string): IsoDate[] | undefined => {
-  const parts = text.split(/[\s,]+/).filter(Boolean);
-  if (!parts.every(isIsoDate)) return undefined;
-  return [...new Set(parts)].sort();
+/** dates separated by spaces or commas: sorted, without duplicates; undefined if any is invalid */
+export const parseDates = (text: string): PlainDate[] | undefined => {
+  const dates = text.split(/[\s,]+/).filter(Boolean).map(parseDate);
+  return dates.every((date) => date !== undefined) ? sortedUnique(dates) : undefined;
 };
 
 /** weekday numbers (0 = Sunday … 6 = Saturday) separated by spaces or commas */
@@ -109,6 +64,38 @@ export const parseWeekdays = (text: string) =>
       .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6),
   );
 
+// ---- days ----
+
+export const today = () => Temporal.Now.plainDateISO();
+
+export const isBefore = (a: PlainDate, b: PlainDate) => Temporal.PlainDate.compare(a, b) < 0;
+export const isAfter = (a: PlainDate, b: PlainDate) => Temporal.PlainDate.compare(a, b) > 0;
+
+/** is the day before min or after max? */
+export const isOutside = (date: PlainDate, min: PlainDate | null, max: PlainDate | null) =>
+  Boolean((min && isBefore(date, min)) || (max && isAfter(date, max)));
+
+export const clamp = (date: PlainDate, min: PlainDate | null, max: PlainDate | null) =>
+  min && isBefore(date, min) ? min : max && isAfter(date, max) ? max : date;
+
+/** 0 = Sunday … 6 = Saturday (Temporal counts 1 = Monday … 7 = Sunday) */
+export const weekdayOf = (date: PlainDate) => date.dayOfWeek % 7;
+
+// ---- months ----
+
+export const firstDayOf = (month: YearMonth) => month.toPlainDate({ day: 1 });
+
+export const lastDayOf = (month: YearMonth) => month.toPlainDate({ day: month.daysInMonth });
+
+/** whole months from one month to another (negative when `to` is earlier) */
+export const monthsBetween = (from: YearMonth, to: YearMonth) => from.until(to, { largestUnit: "months" }).months;
+
+/** is the whole month before min or after max? */
+export const isMonthOutside = (month: YearMonth, min: PlainDate | null, max: PlainDate | null) =>
+  isOutside(lastDayOf(month), min, null) || isOutside(firstDayOf(month), null, max);
+
+// ---- locales ----
+
 /** 0 = Sunday … 6 = Saturday, from the locale when the browser knows it (Monday otherwise) */
 export const localeFirstDayOfWeek = (locale: string) => {
   const info = new Intl.Locale(locale) as Intl.Locale & {
@@ -119,27 +106,28 @@ export const localeFirstDayOfWeek = (locale: string) => {
   return firstDay % 7; // Intl uses 1 = Monday … 7 = Sunday
 };
 
-const formatters = new Map<string, Intl.DateTimeFormat>();
+// the polyfill's DateTimeFormat formats Temporal values (the browser's may not yet)
+const formatters = new Map<string, TemporalIntl.DateTimeFormat>();
 
 const formatter = (locale: string, options: Intl.DateTimeFormatOptions) => {
   const key = `${locale}|${JSON.stringify(options)}`;
   let cached = formatters.get(key);
   if (!cached) {
-    cached = new Intl.DateTimeFormat(locale, { ...options, timeZone: "UTC" });
+    cached = new TemporalIntl.DateTimeFormat(locale, options);
     formatters.set(key, cached);
   }
   return cached;
 };
 
-export const format = (
-  iso: IsoDate,
-  options: Intl.DateTimeFormatOptions,
-  locale: string,
-) => formatter(locale, options).format(parseIso(iso));
+/** a month is formatted through its first day: ISO year-months only format in ISO locales */
+const dayOf = (value: PlainDate | YearMonth) => (value instanceof Temporal.PlainYearMonth ? firstDayOf(value) : value);
+
+export const format = (value: PlainDate | YearMonth, options: Intl.DateTimeFormatOptions, locale: string) =>
+  formatter(locale, options).format(dayOf(value));
 
 export const formatRange = (
-  start: IsoDate,
-  end: IsoDate,
+  start: PlainDate | YearMonth,
+  end: PlainDate | YearMonth,
   options: Intl.DateTimeFormatOptions,
   locale: string,
-) => formatter(locale, options).formatRange(parseIso(start)!, parseIso(end)!);
+) => formatter(locale, options).formatRange(dayOf(start), dayOf(end));
