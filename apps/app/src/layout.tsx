@@ -1,12 +1,16 @@
 /** The page shell shared by all modules: head (styles, htmx, design system) and navigation. */
 
-export type PageName = "home" | "calendar" | "compare" | "range-picker";
+import { HttpRouter, HttpServerResponse } from "effect/http";
+import { toHtml } from "tsx-to-html";
+
+export type PageName = "home" | "calendar" | "compare" | "range-picker" | "filters";
 
 const links: ReadonlyArray<{ page: PageName; href: string; label: string }> = [
   { page: "home", href: "/", label: "Home" },
   { page: "calendar", href: "/calendar", label: "Calendar" },
   { page: "compare", href: "/compare", label: "cally vs ours" },
   { page: "range-picker", href: "/range-picker", label: "Range presets" },
+  { page: "filters", href: "/filters", label: "Filters" },
 ];
 
 export const Layout = ({
@@ -48,5 +52,6 @@ export const Layout = ({
   </html>
 );
 
-/** render a page as a full HTML document */
-export const documentHtml = (html: string) => `<!doctype html>${html}`;
+/** a GET route that answers with a page as a full HTML document (rendered once, at startup) */
+export const pageRoute = (path: `/${string}`, page: Parameters<typeof toHtml>[0]) =>
+  HttpRouter.add("GET", path, HttpServerResponse.html(`<!doctype html>${toHtml(page)}`));

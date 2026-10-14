@@ -24,6 +24,10 @@ export interface Messages {
   rangeUnderflow: (min: string) => string;
   rangeOverflow: (max: string) => string;
   unavailable: string;
+  /** a combobox filter matched nothing */
+  noResults: string;
+  /** a bottom sheet's drag handle (a button that steps through the sizes) */
+  sheetHandle: (step: number, steps: number) => string;
 }
 
 const en: Messages = {
@@ -44,6 +48,8 @@ const en: Messages = {
   rangeUnderflow: (min) => `Choose ${min} or later.`,
   rangeOverflow: (max) => `Choose ${max} or earlier.`,
   unavailable: "This date is not available.",
+  noResults: "No results",
+  sheetHandle: (step, steps) => `Resize sheet, size ${step} of ${steps}`,
 };
 
 const de: Messages = {
@@ -64,6 +70,8 @@ const de: Messages = {
   rangeUnderflow: (min) => `Bitte ${min} oder später wählen.`,
   rangeOverflow: (max) => `Bitte ${max} oder früher wählen.`,
   unavailable: "Dieses Datum ist nicht verfügbar.",
+  noResults: "Keine Treffer",
+  sheetHandle: (step, steps) => `Größe ändern, Stufe ${step} von ${steps}`,
 };
 
 const catalogs: Record<string, Messages> = { en, de };

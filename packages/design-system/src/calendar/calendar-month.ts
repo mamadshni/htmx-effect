@@ -24,6 +24,7 @@ import {
   isAfter,
   isBefore,
   isOutside,
+  MONTH_YEAR,
   parseDate,
   Temporal,
   weekdayOf,
@@ -35,7 +36,6 @@ namespace Module {
   export const tagName = "ds-calendar-month" as const;
 
   const WEEKS = 6;
-  const MONTH_YEAR = { month: "long", year: "numeric" } as const;
   const FULL_DATE = { weekday: "long", day: "numeric", month: "long", year: "numeric" } as const;
   // a Sunday, to name the weekdays
   const SUNDAY = Temporal.PlainDate.from("2023-01-01");

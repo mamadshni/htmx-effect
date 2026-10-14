@@ -106,6 +106,9 @@ export const localeFirstDayOfWeek = (locale: string) => {
   return firstDay % 7; // Intl uses 1 = Monday … 7 = Sunday
 };
 
+/** "Oktober 2026": month headings */
+export const MONTH_YEAR = { month: "long", year: "numeric" } as const;
+
 // the polyfill's DateTimeFormat formats Temporal values (the browser's may not yet)
 const formatters = new Map<string, TemporalIntl.DateTimeFormat>();
 

@@ -11,16 +11,15 @@ export const define = (tag: string, element: CustomElementConstructor) => {
   if (!customElements.get(tag)) customElements.define(tag, element);
 };
 
-export type Listen = <K extends keyof HTMLElementEventMap>(
-  type: K,
-  handler: (event: HTMLElementEventMap[K]) => void,
-) => void;
+export interface Listen {
+  <K extends keyof HTMLElementEventMap>(type: K, handler: (event: HTMLElementEventMap[K]) => void): void;
+  /** the components' own events ("ds-…"), with their detail */
+  <T>(type: `ds-${string}`, handler: (event: CustomEvent<T>) => void): void;
+}
 
 /** an `addEventListener` for the element whose listeners all go away when `signal` aborts */
-export const listenOn =
-  (element: HTMLElement, signal: AbortSignal): Listen =>
-  (type, handler) =>
-    element.addEventListener(type, handler, { signal });
+export const listenOn = (element: HTMLElement, signal: AbortSignal) =>
+  ((type: string, handler: EventListener) => element.addEventListener(type, handler, { signal })) as Listen;
 
 /** set an ARIA state to "true", or remove it */
 export const setAria = (element: Element | null, name: `aria-${string}`, on: boolean) => {
@@ -85,6 +84,20 @@ export function assertIsOneOf<T extends string>(
   name: string,
 ): asserts value is T {
   if (!options.includes(value as T)) fail(name, options.join(" | "), value);
+}
+
+/** numbers from 1 to 100 separated by spaces or commas: ascending, without duplicates; undefined if any is not */
+export const parsePercents = (text: string) => {
+  const numbers = text.split(/[\s,]+/).filter(Boolean).map(Number);
+  return numbers.every((n) => Number.isFinite(n) && n >= 1 && n <= 100)
+    ? [...new Set(numbers)].sort((a, b) => a - b)
+    : undefined;
+};
+
+/** percentages (1-100) separated by spaces */
+export function assertIsPercentList(value: unknown, name: string): asserts value is string {
+  assertIsString(value, name);
+  if (!parsePercents(value)) fail(name, "numbers from 1 to 100 separated by spaces", value);
 }
 
 export function assertIsPredicate(

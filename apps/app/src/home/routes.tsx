@@ -3,7 +3,7 @@
 import { Effect, Layer } from "effect";
 import { HttpRouter, HttpServerResponse } from "effect/http";
 import { toHtml } from "tsx-to-html";
-import { documentHtml } from "../layout.js";
+import { pageRoute } from "../layout.js";
 import { Page, SearchOptions } from "./views.js";
 
 const fruits = [
@@ -24,7 +24,7 @@ const fruits = [
 const startingItems = fruits.slice(0, 5);
 
 export const HomeRoutes = Layer.mergeAll(
-  HttpRouter.add("GET", "/", HttpServerResponse.html(documentHtml(toHtml(<Page items={startingItems} />)))),
+  pageRoute("/", <Page items={startingItems} />),
   HttpRouter.add("GET", "/search-options", (request) =>
     Effect.sync(() => {
       const q = (new URL(request.url, "http://localhost").searchParams.get("q") ?? "")

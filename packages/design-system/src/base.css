@@ -19,7 +19,7 @@
 
 /* ---- fields: text inputs and the buttons next to them ---- */
 
-:is(ds-combobox input[role="combobox"], .ds-date-picker__input, .ds-date-picker__toggle) {
+:is(:is(ds-combobox, ds-combobox-local) input[role="combobox"], .ds-date-picker__input, .ds-date-picker__toggle) {
   box-sizing: border-box;
   font: inherit;
   color: var(--ds-text);
@@ -27,10 +27,10 @@
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius);
 }
-:is(ds-combobox input[role="combobox"], .ds-date-picker__input) {
+:is(:is(ds-combobox, ds-combobox-local) input[role="combobox"], .ds-date-picker__input) {
   padding: 0.5rem 0.65rem;
 }
-:is(ds-combobox input[role="combobox"], .ds-date-picker__input):focus-visible {
+:is(:is(ds-combobox, ds-combobox-local) input[role="combobox"], .ds-date-picker__input):focus-visible {
   outline: 2px solid var(--ds-accent);
   outline-offset: -1px;
   border-color: transparent;
@@ -38,7 +38,7 @@
 
 /* ---- popovers: top layer, below the anchor from its start edge, above when there is no room ---- */
 
-:is(ds-combobox [role="listbox"], .ds-date-picker__dialog) {
+:is(:is(ds-combobox, ds-combobox-local) [role="listbox"], .ds-date-picker__dialog) {
   position-area: block-end span-inline-end;
   position-try-fallbacks: flip-block;
   inset: auto;

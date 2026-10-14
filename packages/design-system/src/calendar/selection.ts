@@ -1,9 +1,5 @@
 import { isAfter, isBefore, parseDate, parseDates, parseRange, Temporal, type PlainDate } from "./date.js";
 
-export const selectionModes = ["single", "range", "multiple"] as const;
-
-export type SelectionMode = (typeof selectionModes)[number];
-
 /** what views need to know to mark selected cells */
 export interface SelectionState {
   includes(date: PlainDate): boolean;
@@ -17,14 +13,13 @@ export interface SelectionState {
  * the date picker for parsing typed text.
  */
 export abstract class Selection implements SelectionState {
-  abstract readonly mode: SelectionMode;
   /** sorted, without duplicates */
   protected dates: PlainDate[] = [];
 
   /** the value as written in the `value` attribute and sent with forms */
   abstract get value(): string;
 
-  /** parse a value or typed text; undefined when it is not valid for this mode */
+  /** parse a value or typed text; undefined when it is not valid for this kind */
   abstract parse(text: string): PlainDate[] | undefined;
 
   /** a day was picked; true when the selection is complete */
@@ -72,8 +67,6 @@ export abstract class Selection implements SelectionState {
 
 /** one day: "YYYY-MM-DD" */
 export class SingleSelection extends Selection {
-  readonly mode = "single";
-
   get value() {
     return this.first?.toString() ?? "";
   }
@@ -93,7 +86,6 @@ export class SingleSelection extends Selection {
 
 /** a start and an end: "YYYY-MM-DD/YYYY-MM-DD" (ISO 8601 interval), picked in two steps */
 export class RangeSelection extends Selection {
-  readonly mode = "range";
   #anchor: PlainDate | null = null;
 
   get value() {
@@ -141,8 +133,6 @@ export class RangeSelection extends Selection {
 
 /** any number of days: "YYYY-MM-DD YYYY-MM-DD …"; each pick toggles a day */
 export class MultiSelection extends Selection {
-  readonly mode = "multiple";
-
   get value() {
     return this.dates.join(" ");
   }
@@ -158,10 +148,3 @@ export class MultiSelection extends Selection {
     return true;
   }
 }
-
-export const createSelection = (mode: SelectionMode): Selection =>
-  mode === "range"
-    ? new RangeSelection()
-    : mode === "multiple"
-      ? new MultiSelection()
-      : new SingleSelection();

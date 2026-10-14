@@ -4,8 +4,7 @@ import { fileURLToPath } from "node:url";
 import { Effect, Layer } from "effect";
 import { HttpRouter, HttpServerResponse } from "effect/http";
 import { build } from "esbuild";
-import { toHtml } from "tsx-to-html";
-import { documentHtml } from "../layout.js";
+import { pageRoute } from "../layout.js";
 import { RangePickerPage } from "./page.js";
 
 const entry = fileURLToPath(new URL("./client/range-picker.ts", import.meta.url));
@@ -20,6 +19,6 @@ const bundle = Effect.promise(() =>
 );
 
 export const RangePickerRoutes = Layer.mergeAll(
-  HttpRouter.add("GET", "/range-picker", HttpServerResponse.html(documentHtml(toHtml(<RangePickerPage />)))),
+  pageRoute("/range-picker", <RangePickerPage />),
   HttpRouter.add("GET", "/assets/range-picker.js", bundle),
 );

@@ -35,7 +35,7 @@ import "../calendar/calendar-select-month.js";
 import "../calendar/calendar-select-year.js";
 import type { CalendarBase } from "../calendar/calendar-base.js";
 import { format, isOutside, optionalDate, type PlainDate } from "../calendar/date.js";
-import { createSelection, type Selection } from "../calendar/selection.js";
+import { RangeSelection, SingleSelection, type Selection } from "../calendar/selection.js";
 import { messagesFor } from "../messages.js";
 import {
   accept,
@@ -135,7 +135,7 @@ namespace Module {
 
     // the value as given (attributes may arrive before `range`), parsed by the selection
     #value = "";
-    #selection: Selection = createSelection("single");
+    #selection: Selection = new SingleSelection();
 
     /** the current value: "YYYY-MM-DD", or "YYYY-MM-DD/YYYY-MM-DD" with `range`; "" when empty */
     get value() {
@@ -201,7 +201,7 @@ namespace Module {
       if (accept(() => assertIsBoolean(value, `${tagName}.range`))) {
         if (value !== this.#range) {
           this.#range = value;
-          this.#selection = createSelection(value ? "range" : "single");
+          this.#selection = value ? new RangeSelection() : new SingleSelection();
           this.#selection.set(this.#value);
         }
       }

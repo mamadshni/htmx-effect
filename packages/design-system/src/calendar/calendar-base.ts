@@ -49,6 +49,7 @@ import {
   lastDayOf,
   localeFirstDayOfWeek,
   monthsBetween,
+  MONTH_YEAR,
   optionalDate,
   parseDate,
   today,
@@ -56,8 +57,6 @@ import {
   type YearMonth,
 } from "./date.js";
 import type { Selection } from "./selection.js";
-
-const MONTH_YEAR = { month: "long", year: "numeric" } as const;
 
 let nextId = 0;
 
@@ -429,44 +428,26 @@ export abstract class CalendarBase extends HTMLElement {
       if (page.getAttribute("aria-disabled") !== "true") this.#turnPage(Number(page.dataset.page));
     });
 
-    this.addEventListener(
-      PartEvent.update,
-      (event) => {
-        if (!own(event)) return;
-        event.stopPropagation();
-        this.#placeSelects();
-        this.#render();
-      },
-      { signal: this.#listeners.signal },
-    );
-    this.addEventListener(
-      PartEvent.focus,
-      (event) => {
-        if (!own(event)) return;
-        const { date, reveal } = (event as CustomEvent<FocusDetail>).detail;
-        this.#goto(date, reveal ?? false);
-      },
-      { signal: this.#listeners.signal },
-    );
-    this.addEventListener(
-      PartEvent.pick,
-      (event) => {
-        if (own(event)) this.#pick((event as CustomEvent<PlainDate>).detail);
-      },
-      { signal: this.#listeners.signal },
-    );
-    this.addEventListener(
-      PartEvent.hover,
-      (event) => {
-        const date = (event as CustomEvent<PlainDate>).detail;
-        // only while a range is being picked, and only for a new day: a render puts a new
-        // button under the pointer, which fires pointerover again
-        if (!own(event) || !this.#selection.anchor || date.equals(this.#hover)) return;
-        this.#hover = date;
-        this.#render();
-      },
-      { signal: this.#listeners.signal },
-    );
+    on(PartEvent.update, (event) => {
+      if (!own(event)) return;
+      event.stopPropagation();
+      this.#placeSelects();
+      this.#render();
+    });
+    on<FocusDetail>(PartEvent.focus, (event) => {
+      if (own(event)) this.#goto(event.detail.date, event.detail.reveal ?? false);
+    });
+    on<PlainDate>(PartEvent.pick, (event) => {
+      if (own(event)) this.#pick(event.detail);
+    });
+    on<PlainDate>(PartEvent.hover, (event) => {
+      const date = event.detail;
+      // only while a range is being picked, and only for a new day: a render puts a new
+      // button under the pointer, which fires pointerover again
+      if (!own(event) || !this.#selection.anchor || date.equals(this.#hover)) return;
+      this.#hover = date;
+      this.#render();
+    });
   }
 
   /** render the header, status and parts; focus follows the cursor when asked or when a day had it */

@@ -1,0 +1,100 @@
+/*
+ * Menus: [role="menu"][popover] (from a menu button, or a submenu from an item) and
+ * [role="menubar"]. Keys and checked states: keyboard/. Selectors use :where(), so any
+ * page rule overrides them.
+ */
+
+/* below its opener (the popover's invoker is its anchor); a menu inside a menu opens beside it */
+:where([role="menu"][popover]) {
+  position-area: block-end span-inline-end;
+  position-try-fallbacks: flip-block, flip-inline;
+  inset: auto;
+  box-sizing: border-box;
+  min-inline-size: 11rem;
+  margin: 0.25rem 0;
+  padding: 0.25rem;
+  color: var(--ds-text);
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+  box-shadow: var(--ds-shadow);
+}
+:where([role="menu"][popover]):popover-open {
+  display: grid;
+}
+:where([role="menu"] [role="menu"][popover]) {
+  position-area: inline-end span-block-end;
+  margin: -0.25rem 0.25rem;
+}
+
+:where([role="menubar"]) {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+}
+:where([role="menu"], [role="menubar"]) :where([role="group"]) {
+  display: grid;
+}
+
+/* ---- items ---- */
+
+:where([role="menu"], [role="menubar"]) :where([role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]) {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  text-decoration: none;
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  border-radius: var(--ds-radius-small);
+  cursor: pointer;
+}
+:where([role="menu"], [role="menubar"]) :where([role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]):where(:hover, :focus) {
+  outline: none;
+  background: var(--ds-hover);
+}
+:where([role="menu"], [role="menubar"]) :where([role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]):where(:focus-visible) {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: -2px;
+}
+:where([role="menu"], [role="menubar"]) :where([aria-disabled="true"]) {
+  color: var(--ds-muted);
+  background: none;
+  cursor: default;
+}
+
+/* checked state: a tick or a dot in front */
+:where([role="menu"]) :where([role="menuitemradio"], [role="menuitemcheckbox"])::before {
+  content: "";
+  inline-size: 1em;
+  text-align: center;
+}
+:where([role="menu"] [role="menuitemcheckbox"][aria-checked="true"])::before {
+  content: "✓";
+}
+:where([role="menu"] [role="menuitemradio"][aria-checked="true"])::before {
+  content: "•";
+}
+
+/* an item with a submenu */
+:where([role="menu"] [role="menuitem"][aria-haspopup])::after {
+  content: "›";
+  margin-inline-start: auto;
+  padding-inline-start: 1rem;
+}
+:where([role="menu"] [role="menuitem"][aria-haspopup]):dir(rtl)::after {
+  content: "‹";
+}
+
+:where([role="menu"] [role="separator"]) {
+  block-size: 1px;
+  margin: 0.25rem 0;
+  background: var(--ds-border);
+}

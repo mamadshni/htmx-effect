@@ -1,0 +1,52 @@
+/**
+ * Filters module: the page, and each example's form post (/filters/<variant>). A form sends
+ * the selection (`filter`: the checked checkboxes, or the chips' hidden inputs) and what
+ * changed: `toggle` (a menu item) or `remove` (a chip's ×). The server saves the new
+ * selection and answers htmx with the pieces it changed (out-of-band swaps, see views.tsx),
+ * or a plain post with a redirect back to the example.
+ */
+
+import { Effect, Layer, Option } from "effect";
+import { HttpRouter, HttpServerRequest, HttpServerResponse, UrlParams } from "effect/http";
+import { toHtml } from "tsx-to-html";
+import { activeFilters, isVariant, saveFilters, type Variant } from "./store.js";
+import { Changed, FiltersPage } from "./views.js";
+
+/**
+ * After a chip's × removed its filter, that button is gone: focus the next chip's × (or the
+ * previous one), else the chip list. htmx focuses the element marked autofocus.
+ */
+const focusAfterRemoving = (v: Variant, id: string, before: ReadonlyArray<string>) => {
+  const after = activeFilters(v).map((f) => f.id);
+  const index = before.indexOf(id);
+  const next = after[index] ?? after[index - 1];
+  return next ? `${v}-remove-${next}` : `${v}-active-filters`;
+};
+
+const post = Effect.gen(function* () {
+  const { variant } = yield* HttpRouter.params;
+  if (!isVariant(variant)) return HttpServerResponse.text("Unknown example", { status: 404 });
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  const form = yield* request.urlParamsBody;
+  const field = (name: string) => Option.getOrUndefined(UrlParams.getFirst(form, name));
+  const toggle = field("toggle");
+  const remove = field("remove");
+
+  let selection = UrlParams.getAll(form, "filter").filter((id) => id !== remove);
+  if (toggle) selection = selection.includes(toggle) ? selection.filter((id) => id !== toggle) : [...selection, toggle];
+
+  // keep the order filters were added in: the saved ones first, new ones after
+  const before = activeFilters(variant).map((f) => f.id);
+  saveFilters(variant, [...before.filter((id) => selection.includes(id)), ...selection.filter((id) => !before.includes(id))]);
+
+  // no htmx (no JavaScript): back to the example, which shows the saved filters
+  if (request.headers["hx-request"] !== "true") return HttpServerResponse.redirect(`/filters#${variant}`, { status: 303 });
+  const focus = remove !== undefined ? focusAfterRemoving(variant, remove, before) : undefined;
+  return HttpServerResponse.html(toHtml(<Changed v={variant} focus={focus} />));
+}).pipe(Effect.catch(() => Effect.succeed(HttpServerResponse.text("Bad form", { status: 400 }))));
+
+export const FiltersRoutes = Layer.mergeAll(
+  // rendered per request: it shows the saved filters
+  HttpRouter.add("GET", "/filters", Effect.sync(() => HttpServerResponse.html(`<!doctype html>${toHtml(<FiltersPage />)}`))),
+  HttpRouter.add("POST", "/filters/:variant", post),
+);

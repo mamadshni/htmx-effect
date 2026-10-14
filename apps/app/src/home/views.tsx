@@ -1,6 +1,8 @@
 import { Layout } from "../layout.js";
 import { Field, Section } from "../ui.js";
 
+const countries = ["Åland Islands", "Austria", "Belgium", "Denmark", "France", "Germany", "Italy", "Netherlands", "Spain", "Switzerland"];
+
 export const Page = ({ items }: { items: ReadonlyArray<string> }) => (
   <Layout title="Home" current="home">
     <main class="page">
@@ -10,6 +12,52 @@ export const Page = ({ items }: { items: ReadonlyArray<string> }) => (
         <button type="button" class="button" commandfor="search-dialog" command="show-modal">
           Search fruits
         </button>
+      </Section>
+
+      <Section id="combobox-local" title="Combobox (filtered in the browser)">
+        <Field id="country" label="Country">
+          <ds-combobox-local filter="starts-with">
+            <input
+              id="country"
+              type="search"
+              name="country"
+              autocomplete="off"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-controls="country-options"
+              aria-expanded="false"
+              placeholder="Type to filter…"
+            />
+            <ul id="country-options" role="listbox" popover="manual">
+              {countries.map((country) => (
+                <li id={`country-${country.toLowerCase().replaceAll(" ", "-")}`} role="option">
+                  {country}
+                </li>
+              ))}
+            </ul>
+          </ds-combobox-local>
+        </Field>
+      </Section>
+
+      <Section id="menus" title="Menus">
+        <div class="button-row">
+          <button type="button" class="button" id="actions-button" popovertarget="actions-menu" aria-haspopup="menu">
+            Actions
+          </button>
+        </div>
+        <ActionsMenu />
+        <EditorMenubar />
+      </Section>
+
+      <Section id="sheets" title="Bottom sheets">
+        <div class="button-row">
+          <button type="button" class="button" popovertarget="places">
+            Places (bottom sheet)
+          </button>
+          <button type="button" class="button" commandfor="sort" command="show-modal">
+            Sort (modal sheet)
+          </button>
+        </div>
       </Section>
 
       <Section id="date-picker" title="Date picker">
@@ -53,7 +101,117 @@ export const Page = ({ items }: { items: ReadonlyArray<string> }) => (
     </main>
 
     <SearchDialog items={items} />
+    <PlacesSheet />
+    <SortSheet />
   </Layout>
+);
+
+const places = ["Café Central", "Stadtpark", "Naschmarkt", "Albertina", "Prater", "Belvedere", "MuseumsQuartier", "Donauinsel"];
+
+/** non-modal: the page stays usable; drag between 25%, 50% and 90% of the screen */
+const PlacesSheet = () => (
+  <ds-bottom-sheet snap-points="25 50 90">
+    <div id="places" popover="manual" aria-labelledby="places-title">
+      <header class="sheet-header">
+        <h2 id="places-title">Places nearby</h2>
+        <button type="button" class="button button--ghost" popovertarget="places" popovertargetaction="hide">
+          Close
+        </button>
+      </header>
+      <ul class="sheet-list">
+        {places.map((place) => (
+          <li>{place}</li>
+        ))}
+      </ul>
+    </div>
+  </ds-bottom-sheet>
+);
+
+/** modal: fits its content; Escape, the backdrop, Done or dragging down close it */
+const SortSheet = () => (
+  <ds-modal-sheet>
+    <dialog id="sort" aria-labelledby="sort-title">
+      <header class="sheet-header">
+        <h2 id="sort-title">Sort by</h2>
+      </header>
+      <form method="dialog" class="sheet-form">
+        {["Relevance", "Distance", "Rating", "Price"].map((option, i) => (
+          <label>
+            <input type="radio" name="sort" value={option.toLowerCase()} checked={i === 0} /> {option}
+          </label>
+        ))}
+        <button class="button">Done</button>
+      </form>
+    </dialog>
+  </ds-modal-sheet>
+);
+
+/** a menu button with a submenu, a checkbox item and a radio group; keys: the design system's keyboard module */
+const ActionsMenu = () => (
+  <div id="actions-menu" popover role="menu" aria-labelledby="actions-button">
+    <button type="button" role="menuitem">
+      Edit
+    </button>
+    <button type="button" role="menuitem">
+      Duplicate
+    </button>
+    <button type="button" role="menuitem" popovertarget="share-menu" aria-haspopup="menu">
+      Share
+    </button>
+    <div id="share-menu" popover role="menu" aria-label="Share">
+      <button type="button" role="menuitem">
+        Email
+      </button>
+      <button type="button" role="menuitem">
+        Copy link
+      </button>
+    </div>
+    <button type="button" role="menuitem" aria-disabled="true">
+      Archive
+    </button>
+    <div role="separator"></div>
+    <button type="button" role="menuitemcheckbox" aria-checked="false">
+      Show hidden files
+    </button>
+    <div role="group" aria-label="Sort by">
+      <button type="button" role="menuitemradio" aria-checked="true">
+        Sort by name
+      </button>
+      <button type="button" role="menuitemradio" aria-checked="false">
+        Sort by date
+      </button>
+    </div>
+    <div role="separator"></div>
+    <button type="button" role="menuitem">
+      Delete
+    </button>
+  </div>
+);
+
+const menubarMenus = [
+  { id: "file", label: "File", items: ["New", "Open…", "Save"] },
+  { id: "edit", label: "Edit", items: ["Undo", "Redo", "Cut", "Copy", "Paste"] },
+  { id: "view", label: "View", items: ["Zoom in", "Zoom out"] },
+];
+
+/** a menubar: one tab stop, ArrowRight/ArrowLeft along the bar, ArrowDown opens a menu */
+const EditorMenubar = () => (
+  <div role="menubar" aria-label="Editor">
+    {menubarMenus.map(({ id, label, items }, i) => (
+      <>
+        <button type="button" role="menuitem" popovertarget={`${id}-menu`} aria-haspopup="menu" tabindex={i === 0 ? "0" : "-1"}>
+          {label}
+        </button>
+        <div id={`${id}-menu`} popover role="menu" aria-label={label}>
+          {items.map((item) => (
+            <button type="button" role="menuitem">
+              {item}
+            </button>
+          ))}
+        </div>
+      </>
+    ))}
+  </div>
 );
 
 export const SearchDialog = ({ items }: { items: ReadonlyArray<string> }) => (

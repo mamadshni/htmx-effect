@@ -1,4 +1,4 @@
-import type { CalendarBase, DsCombobox, DsDatePicker } from "@combo/design-system/bundle/index.js";
+import type { CalendarBase, DsBottomSheet, DsCombobox, DsComboboxLocal, DsDatePicker, DsModalSheet } from "@combo/design-system/bundle/index.js";
 
 /** attributes of the calendar containers, also passed on by <ds-date-picker> */
 type CalendarAttributes = {
@@ -21,6 +21,9 @@ type CalendarAttributes = {
 /** HTML attributes and children (named so it does not clash with JSX.Element) */
 type HtmlProps = JSX.Attributes<HTMLElement> & { children?: JSX.Node };
 
+/** sizes in % of the viewport height ("" = fit the content), the current one, the text language */
+type SheetAttributes = HtmlProps & { "snap-points"?: string; snap?: number; locale?: string };
+
 type CalendarContainer = HtmlProps &
   CalendarAttributes & {
     /** "YYYY-MM-DD", "start/end" (range) or dates separated by spaces (multi) */
@@ -39,7 +42,14 @@ declare global {
 
     // design-system elements: only their HTML attributes (class getters/methods are not attributes)
     interface IntrinsicElements {
+      /** options from the server (htmx swaps the listbox) */
       "ds-combobox": HtmlProps;
+      /** filters its own options in the browser; `filter` = where the query must match */
+      "ds-combobox-local": HtmlProps & { filter?: "contains" | "starts-with"; locale?: string };
+      /** non-modal sheet around a [popover] */
+      "ds-bottom-sheet": SheetAttributes;
+      /** modal sheet around a <dialog> */
+      "ds-modal-sheet": SheetAttributes;
       "ds-calendar": CalendarContainer;
       "ds-calendar-range": CalendarContainer;
       "ds-calendar-multi": CalendarContainer;
@@ -63,4 +73,4 @@ declare global {
 }
 
 // keep the import: it loads the design system's global types (HTMLElementTagNameMap etc.)
-export type { CalendarBase, DsCombobox, DsDatePicker };
+export type { CalendarBase, DsBottomSheet, DsCombobox, DsComboboxLocal, DsDatePicker, DsModalSheet };

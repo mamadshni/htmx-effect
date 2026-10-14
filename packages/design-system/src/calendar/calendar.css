@@ -12,6 +12,21 @@
   color: var(--ds-text);
 }
 
+/*
+ * Only for screen readers: the heading when selects stand in for it (it still labels the
+ * calendar), a single month's title (the header already names it), the selects' labels.
+ */
+[data-selects] > .ds-calendar__header .ds-calendar__heading,
+ds-calendar-month:only-of-type .ds-calendar-month__title,
+.ds-calendar-select__label {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* ---- buttons: header (previous / next) and days ---- */
 
 :is(ds-calendar, ds-calendar-range, ds-calendar-multi) button {
@@ -63,15 +78,6 @@
 .ds-calendar__selects:empty {
   display: none;
 }
-/* with selects, the heading is only for screen readers (it labels the calendar) */
-[data-selects] > .ds-calendar__header .ds-calendar__heading {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
 .ds-calendar__heading {
   flex: 1;
   margin: 0;
@@ -98,15 +104,6 @@ ds-calendar-month {
   margin: 0 0 0.25rem;
   font-size: 0.9rem;
   text-align: center;
-}
-/* a single month: the header already names it */
-ds-calendar-month:only-of-type .ds-calendar-month__title {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }
 .ds-calendar-month__table {
   inline-size: 15.75rem;
@@ -173,14 +170,6 @@ ds-calendar-range ds-calendar-month td button[data-range-end]:not([data-range-st
 
 :is(ds-calendar-select-month, ds-calendar-select-year) {
   display: inline-block;
-}
-.ds-calendar-select__label {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }
 .ds-calendar-select__select {
   padding: 0.25rem 0.5rem;
