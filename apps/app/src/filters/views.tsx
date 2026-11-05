@@ -1,5 +1,6 @@
 /**
- * The filters page: the same filter form twice, to compare with a screen reader.
+ * The filters page: the same filter form twice, to compare with a screen reader, and a third
+ * example with filters that have values, edited in a dialog under their chip (chips.tsx).
  *
  * A. "checkboxes" (recommended): native checkboxes (name="filter") in a disclosure panel
  *    (a popover <fieldset>). Saved on every change with htmx, or with Apply (also the form's
@@ -15,12 +16,13 @@
  */
 
 import { Layout } from "../layout.js";
-import { activeFilters, filters, isActive, tasks, visibleTasks, type Filter, type Variant } from "./store.js";
+import { ChipsExample } from "./chips.js";
+import { activeFilters, filters, isActive, tasks, visibleTasks, type Filter, type Task, type Variant } from "./store.js";
 
-const oob = (swap: boolean, how = "true") => (swap ? { "hx-swap-oob": how } : {});
+export const oob = (swap: boolean, how = "true") => (swap ? { "hx-swap-oob": how } : {});
 
 /** "3 of 8 tasks" */
-const countText = (v: Variant) => `${visibleTasks(v).length} of ${tasks.length} tasks`;
+export const countText = (shown: ReadonlyArray<Task>) => `${shown.length} of ${tasks.length} tasks`;
 
 // ---- the two ways to pick filters ----
 
@@ -95,11 +97,12 @@ const ActiveFilters = ({ v, swap = false, focus }: { v: Variant; swap?: boolean;
   );
 };
 
-const Results = ({ v, swap = false }: { v: Variant; swap?: boolean }) => (
+/** `v`: the example (ids are prefixed with it); `shown`: the tasks that pass its filters */
+export const Results = ({ v, shown, swap = false }: { v: string; shown: ReadonlyArray<Task>; swap?: boolean }) => (
   <div id={`${v}-results`} class="filter-results" {...oob(swap)}>
-    <h3 class="filter-results__title">{countText(v)}</h3>
+    <h3 class="filter-results__title">{countText(shown)}</h3>
     <ul class="filter-results__list">
-      {visibleTasks(v).map((task) => (
+      {shown.map((task) => (
         <li>
           <span class="filter-results__name">{task.title}</span>
           <span class="filter-results__meta">
@@ -114,17 +117,22 @@ const Results = ({ v, swap = false }: { v: Variant; swap?: boolean }) => (
 );
 
 /** the announcement; on the page it starts empty (nothing to announce on load) */
-const Status = ({ v }: { v: Variant }) => <p id={`${v}-status`} class="visually-hidden" role="status"></p>;
+export const Status = ({ v }: { v: string }) => <p id={`${v}-status`} class="visually-hidden" role="status"></p>;
+
+/** the status's new text (only its content is swapped, so it is announced) */
+export const StatusText = ({ v, text }: { v: string; text: string }) => (
+  <p id={`${v}-status`} {...oob(true, "innerHTML")}>
+    {text}
+  </p>
+);
 
 /** everything a change touches: every filter control (a chip may have unchecked one), chips, results, status text */
 export const Changed = ({ v, focus }: { v: Variant; focus?: string | undefined }) => (
   <>
     {filters.map((filter) => (v === "checkboxes" ? <FilterCheckbox filter={filter} swap /> : <FilterMenuItem filter={filter} swap />))}
     <ActiveFilters v={v} swap focus={focus} />
-    <Results v={v} swap />
-    <p id={`${v}-status`} {...oob(true, "innerHTML")}>
-      {`Filters saved. ${countText(v)} shown.`}
-    </p>
+    <Results v={v} shown={visibleTasks(v)} swap />
+    <StatusText v={v} text={`Filters saved. ${countText(visibleTasks(v))} shown.`} />
   </>
 );
 
@@ -185,7 +193,7 @@ const Example = ({ v, title, children }: { v: Variant; title: string; children: 
     </h2>
     {children}
     <Status v={v} />
-    <Results v={v} />
+    <Results v={v} shown={visibleTasks(v)} />
   </section>
 );
 
@@ -195,7 +203,8 @@ export const FiltersPage = () => (
       <header class="intro">
         <h1>Filters</h1>
         <p>
-          The same filter form built two ways, to compare with a screen reader. Each has its own saved filters. In both,
+          The same filter form built two ways, to compare with a screen reader, then filters with values edited under
+          their chip. Each example has its own saved filters. In A and B,
           one <code>&lt;form&gt;</code> handles adding and removing, posts with htmx (or normally without JavaScript), and
           the server saves the selection and answers with the changed pieces and a status message. A chip's × removes
           its filter.
@@ -225,6 +234,8 @@ export const FiltersPage = () => (
         </ul>
         <MenuForm />
       </Example>
+
+      <ChipsExample />
     </main>
   </Layout>
 );

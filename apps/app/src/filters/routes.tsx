@@ -9,7 +9,8 @@
 import { Effect, Layer, Option } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse, UrlParams } from "effect/http";
 import { toHtml } from "tsx-to-html";
-import { activeFilters, isVariant, saveFilters, type Variant } from "./store.js";
+import { chipId, ChipsChanged, removeId } from "./chips.js";
+import { activeFilters, editedFields, fieldById, isVariant, removeField, saveField, saveFilters, type Variant } from "./store.js";
 import { Changed, FiltersPage } from "./views.js";
 
 /**
@@ -45,8 +46,38 @@ const post = Effect.gen(function* () {
   return HttpServerResponse.html(toHtml(<Changed v={variant} focus={focus} />));
 }).pipe(Effect.catch(() => Effect.succeed(HttpServerResponse.text("Bad form", { status: 400 }))));
 
+/**
+ * C: one filter's editor (field=<id>, value=…) or a chip's × (remove=<id>). Values that are
+ * not options are refused with a status message; no value removes the filter.
+ */
+const postChips = Effect.gen(function* () {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  const form = yield* request.urlParamsBody;
+  const remove = fieldById(Option.getOrUndefined(UrlParams.getFirst(form, "remove")));
+  const field = remove ?? fieldById(Option.getOrUndefined(UrlParams.getFirst(form, "field")));
+  if (!field) return HttpServerResponse.text("Unknown filter", { status: 400 });
+
+  const before = editedFields().map((e) => e.field);
+  const message = remove ? (removeField(remove), undefined) : saveField(field, UrlParams.getAll(form, "value"));
+
+  if (request.headers["hx-request"] !== "true") return HttpServerResponse.redirect("/filters#chips", { status: 303 });
+  // focus: after ×, the next chip's × (as in A and B); else the chip (gone: + Add filter)
+  const after = editedFields().map((e) => e.field);
+  const index = before.indexOf(field);
+  const next = after[index] ?? after[index - 1];
+  const focus = remove
+    ? next
+      ? removeId(next)
+      : "chips-active-filters"
+    : after.includes(field)
+      ? chipId(field)
+      : "chips-add";
+  return HttpServerResponse.html(toHtml(<ChipsChanged message={message} focus={focus} />));
+}).pipe(Effect.catch(() => Effect.succeed(HttpServerResponse.text("Bad form", { status: 400 }))));
+
 export const FiltersRoutes = Layer.mergeAll(
   // rendered per request: it shows the saved filters
   HttpRouter.add("GET", "/filters", Effect.sync(() => HttpServerResponse.html(`<!doctype html>${toHtml(<FiltersPage />)}`))),
+  HttpRouter.add("POST", "/filters/chips", postChips),
   HttpRouter.add("POST", "/filters/:variant", post),
 );

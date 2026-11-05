@@ -1,4 +1,5 @@
 import "./keyboard/keyboard.js";
+import "./popover/draft.js";
 import "./combobox/combobox.js";
 import "./combobox/combobox-local.js";
 import "./calendar/calendar-month.js";

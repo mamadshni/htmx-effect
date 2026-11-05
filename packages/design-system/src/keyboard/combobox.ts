@@ -29,7 +29,13 @@ export const syncCombobox = (input: HTMLElement) => {
   const expanded = isExpanded(input);
   if (listbox?.isConnected) {
     listbox.popover ||= "manual";
-    listbox.togglePopover(expanded);
+    try {
+      listbox.togglePopover(expanded);
+    } catch {
+      // a popover cannot open while another one is opening, e.g. a dialog popover focusing
+      // this input as it opens: try again once that is done
+      requestAnimationFrame(() => syncCombobox(input));
+    }
   }
   const active = expanded && listbox ? activeOf(listbox) : undefined;
   if (active) {

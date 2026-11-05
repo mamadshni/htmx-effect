@@ -41,7 +41,8 @@ rejected with a warning and the previous one is kept. Text is English or German,
 the input) and every menu (`[popover][role="menu"]`, `[role="menubar"]` with `menuitem`,
 `menuitemcheckbox`, `menuitemradio`), following the ARIA APG. Native checkboxes in a popover
 panel get arrow keys on top of their own behaviour, without any role changes. Plain markup gets it too, also
-when added later by htmx; no element needed.
+when added later by htmx; no element needed. A form inside a popover (e.g. an editor dialog
+under a filter chip) is a draft: closing the popover without saving resets it (`src/popover/draft.ts`).
 
 Dates are `YYYY-MM-DD` strings in attributes and form values, and `Temporal.PlainDate`
 (`@js-temporal/polyfill`) in JavaScript: event details, `isDateDisallowed`, `start`/`end`.
@@ -53,5 +54,5 @@ Dates are `YYYY-MM-DD` strings in attributes and form values, and `Temporal.Plai
 | `/` | Every component once; the server combobox is backed by `/search-options` |
 | `/calendar` | Calendar and date picker API tables, live examples with their code and events |
 | `/compare` | [cally](https://github.com/WickyNilliams/cally) next to our calendar, scenario by scenario |
-| `/filters` | The same htmx filter form two ways, to compare with a screen reader: native checkboxes in a disclosure (recommended) and a menu of submit buttons; each saves its own selection |
+| `/filters` | The same htmx filter form two ways, to compare with a screen reader: native checkboxes in a disclosure (recommended) and a menu of submit buttons; then chips whose label opens an editor `<dialog popover>` under them (checkboxes, combobox or text, Apply / Cancel); each example saves its own filters |
 | `/range-picker` | `<app-range-picker>`: cally range calendar with relative presets (app code, not the design system) |

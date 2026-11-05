@@ -67,3 +67,93 @@ export const visibleTasks = (variant: Variant) => {
   const applied = activeFilters(variant);
   return tasks.filter((task) => applied.every((filter) => filter.matches(task)));
 };
+
+// ---- C: filters with a value, edited in a dialog under their chip ----
+
+export interface Choice {
+  readonly id: string;
+  readonly label: string;
+}
+
+/** a filter with values: picked with checkboxes or a combobox (from `options`), or typed */
+export interface Field {
+  readonly id: string;
+  readonly label: string;
+  readonly kind: "checkboxes" | "combobox" | "text";
+  readonly options?: ReadonlyArray<Choice>;
+  readonly matches: (task: Task, values: ReadonlyArray<string>) => boolean;
+}
+
+export const fields: ReadonlyArray<Field> = [
+  {
+    id: "status",
+    label: "Status",
+    kind: "checkboxes",
+    options: [
+      { id: "open", label: "Open" },
+      { id: "done", label: "Done" },
+    ],
+    matches: (t, values) => values.includes(t.status),
+  },
+  {
+    id: "assignee",
+    label: "Assignee",
+    kind: "combobox",
+    options: [
+      { id: "me", label: "Me" },
+      { id: "sam", label: "Sam" },
+      { id: "unassigned", label: "Unassigned" },
+    ],
+    matches: (t, values) => values.includes(t.assignee ?? "unassigned"),
+  },
+  {
+    id: "title",
+    label: "Title contains",
+    kind: "text",
+    matches: (t, values) => values.every((text) => t.title.toLowerCase().includes(text.toLowerCase())),
+  },
+];
+
+export const fieldById = (id: string | undefined) => fields.find((f) => f.id === id);
+
+/** the edited filters' values by field id, in the order they were added */
+const edited = new Map<string, ReadonlyArray<string>>([["status", ["open"]]]);
+
+export const editedFields = () =>
+  [...edited].flatMap(([id, values]) => {
+    const field = fieldById(id);
+    return field ? [{ field, values }] : [];
+  });
+
+export const valuesOf = (field: Field) => edited.get(field.id) ?? [];
+
+/** "Open, Done" or "“crash”" */
+export const summary = (field: Field, values: ReadonlyArray<string>) =>
+  field.options
+    ? values.map((id) => field.options?.find((o) => o.id === id)?.label ?? id).join(", ")
+    : values.map((text) => `“${text}”`).join(", ");
+
+/**
+ * Save a field's submitted values; none (nothing checked, an empty text) removes the filter.
+ * A combobox sends the option's label (what the input shows). Returns an error to show
+ * when a value is not one of the options (nothing is saved then).
+ */
+export const saveField = (field: Field, submitted: ReadonlyArray<string>): string | undefined => {
+  const values = submitted.map((value) => value.trim()).filter(Boolean);
+  const ids = field.options
+    ? values.map((value) => field.options?.find((o) => o.id === value || o.label.toLowerCase() === value.toLowerCase())?.id)
+    : values;
+  const unknown = values.find((_, i) => ids[i] === undefined);
+  if (unknown !== undefined) return `No ${field.label.toLowerCase()} “${unknown}”. The filter was not changed.`;
+  if (ids.length === 0) edited.delete(field.id);
+  else edited.set(field.id, ids as ReadonlyArray<string>);
+  return undefined;
+};
+
+export const removeField = (field: Field) => edited.delete(field.id);
+
+/** the tasks that match every edited filter */
+export const editedTasks = () => {
+  const applied = editedFields();
+  return tasks.filter((task) => applied.every(({ field, values }) => field.matches(task, values)));
+};

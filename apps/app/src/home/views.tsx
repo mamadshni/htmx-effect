@@ -1,7 +1,18 @@
 import { Layout } from "../layout.js";
 import { Field, Section } from "../ui.js";
 
-const countries = ["Åland Islands", "Austria", "Belgium", "Denmark", "France", "Germany", "Italy", "Netherlands", "Spain", "Switzerland"];
+const countries = [
+  "Åland Islands",
+  "Austria",
+  "Belgium",
+  "Denmark",
+  "France",
+  "Germany",
+  "Italy",
+  "Netherlands",
+  "Spain",
+  "Switzerland",
+];
 
 export const Page = ({ items }: { items: ReadonlyArray<string> }) => (
   <Layout title="Home" current="home">
@@ -41,7 +52,13 @@ export const Page = ({ items }: { items: ReadonlyArray<string> }) => (
 
       <Section id="menus" title="Menus">
         <div class="button-row">
-          <button type="button" class="button" id="actions-button" popovertarget="actions-menu" aria-haspopup="menu">
+          <button
+            type="button"
+            class="button"
+            id="actions-button"
+            popovertarget="actions-menu"
+            aria-haspopup="menu"
+          >
             Actions
           </button>
         </div>
@@ -68,7 +85,14 @@ export const Page = ({ items }: { items: ReadonlyArray<string> }) => (
 
       <Section id="date-range-picker" title="Date range picker">
         <Field id="stay" label="Stay">
-          <ds-date-picker id="stay" name="stay" range months={2} min="2026-01-01" max="2026-12-31" />
+          <ds-date-picker
+            id="stay"
+            name="stay"
+            range
+            months={2}
+            min="2026-01-01"
+            max="2026-12-31"
+          />
         </Field>
       </Section>
 
@@ -106,7 +130,16 @@ export const Page = ({ items }: { items: ReadonlyArray<string> }) => (
   </Layout>
 );
 
-const places = ["Café Central", "Stadtpark", "Naschmarkt", "Albertina", "Prater", "Belvedere", "MuseumsQuartier", "Donauinsel"];
+const places = [
+  "Café Central",
+  "Stadtpark",
+  "Naschmarkt",
+  "Albertina",
+  "Prater",
+  "Belvedere",
+  "MuseumsQuartier",
+  "Donauinsel",
+];
 
 /** non-modal: the page stays usable; drag between 25%, 50% and 90% of the screen */
 const PlacesSheet = () => (
@@ -114,7 +147,12 @@ const PlacesSheet = () => (
     <div id="places" popover="manual" aria-labelledby="places-title">
       <header class="sheet-header">
         <h2 id="places-title">Places nearby</h2>
-        <button type="button" class="button button--ghost" popovertarget="places" popovertargetaction="hide">
+        <button
+          type="button"
+          class="button button--ghost"
+          popovertarget="places"
+          popovertargetaction="hide"
+        >
           Close
         </button>
       </header>
@@ -137,7 +175,8 @@ const SortSheet = () => (
       <form method="dialog" class="sheet-form">
         {["Relevance", "Distance", "Rating", "Price"].map((option, i) => (
           <label>
-            <input type="radio" name="sort" value={option.toLowerCase()} checked={i === 0} /> {option}
+            <input type="radio" name="sort" value={option.toLowerCase()} checked={i === 0} />{" "}
+            {option}
           </label>
         ))}
         <button class="button">Done</button>
@@ -199,7 +238,13 @@ const EditorMenubar = () => (
   <div role="menubar" aria-label="Editor">
     {menubarMenus.map(({ id, label, items }, i) => (
       <>
-        <button type="button" role="menuitem" popovertarget={`${id}-menu`} aria-haspopup="menu" tabindex={i === 0 ? "0" : "-1"}>
+        <button
+          type="button"
+          role="menuitem"
+          popovertarget={`${id}-menu`}
+          aria-haspopup="menu"
+          tabindex={i === 0 ? "0" : "-1"}
+        >
           {label}
         </button>
         <div id={`${id}-menu`} popover role="menu" aria-label={label}>
