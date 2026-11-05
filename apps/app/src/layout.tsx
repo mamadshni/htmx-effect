@@ -3,7 +3,7 @@
 import { HttpRouter, HttpServerResponse } from "effect/http";
 import { toHtml } from "tsx-to-html";
 
-export type PageName = "home" | "calendar" | "compare" | "range-picker" | "filters";
+export type PageName = "home" | "calendar" | "compare" | "range-picker" | "filters" | "export";
 
 const links: ReadonlyArray<{ page: PageName; href: string; label: string }> = [
   { page: "home", href: "/", label: "Home" },
@@ -11,6 +11,7 @@ const links: ReadonlyArray<{ page: PageName; href: string; label: string }> = [
   { page: "compare", href: "/compare", label: "cally vs ours" },
   { page: "range-picker", href: "/range-picker", label: "Range presets" },
   { page: "filters", href: "/filters", label: "Filters" },
+  { page: "export", href: "/export", label: "Export" },
 ];
 
 export const Layout = ({

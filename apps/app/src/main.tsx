@@ -7,6 +7,7 @@ import { Layer } from "effect";
 import { HttpRouter, HttpServerResponse, HttpStaticServer } from "effect/http";
 import { CalendarRoutes } from "./calendar/routes.js";
 import { CompareRoutes } from "./compare/routes.js";
+import { ExportRoutes } from "./export/routes.js";
 import { FiltersRoutes } from "./filters/routes.js";
 import { HomeRoutes } from "./home/routes.js";
 import { RangePickerRoutes } from "./range-picker/routes.js";
@@ -38,7 +39,7 @@ const Assets = Layer.mergeAll(
 );
 
 HttpRouter.serve(
-  Layer.mergeAll(HomeRoutes, CalendarRoutes, CompareRoutes, RangePickerRoutes, FiltersRoutes, Assets),
+  Layer.mergeAll(HomeRoutes, CalendarRoutes, CompareRoutes, RangePickerRoutes, FiltersRoutes, ExportRoutes, Assets),
 ).pipe(
   Layer.provide(NodeHttpServer.layer(createServer, { port: Number(process.env.PORT ?? 3000) })),
   Layer.launch,
