@@ -7,6 +7,9 @@
  * NARROW_BELOW. What a layout decides is the columns: where each block starts and how many
  * columns it spans. Rows only order the blocks: on a page, each row is as tall as its content.
  *
+ * On a page (layoutCss with <grid-flow>), each block is as tall as its content and pushes down
+ * only the blocks under it in its columns; blocks beside it keep their own height.
+ *
  * A layout is a list of placements: a block, its top-left cell and its width in columns. Cells
  * are 1-based, like CSS grid lines, so a placement maps to
  * `grid-area: <row> / <column> / span <height> / span <width>`.
@@ -310,36 +313,61 @@ export const templateAreas = (layout: Layout, columns: Columns): ReadonlyArray<s
 export const areasValue = (layout: Layout, columns: Columns) =>
   templateAreas(layout, columns).map((row) => `"${row}"`).join(" ") || "none";
 
+/** reading order: top to bottom, left to right */
+const inReadingOrder = (layout: Layout) => [...layout].sort((a, b) => a.row - b.row || a.column - b.column);
+
 /**
- * A stylesheet that recreates both layouts, to copy into another page: the narrow one first,
- * the wide one from NARROW_BELOW up. Rows are as tall as their content. Both use the same area
- * names, so each block needs one grid-area rule.
+ * A stylesheet that recreates both layouts, to copy into another page with <grid-flow>
+ * (client/grid-flow.ts): the narrow layout first, the wide one from NARROW_BELOW up.
+ *
+ * Each block gets its own place as custom properties: --column and --span (what counts), --row
+ * (the order) and --rows. With <grid-flow>, each block is as tall as its content and only the
+ * blocks under it, in its columns, move down. Without it, the same properties place the blocks
+ * on shared rows, aligned to the top.
  */
 export const layoutCss = (layouts: Layouts, selector = ".layout") => {
-  const areas = (view: View, indent: string) => {
-    const rows = templateAreas(layouts[view], columnsOf(view));
-    return rows.length === 0
-      ? [`${indent}grid-template-areas: none;`]
-      : [`${indent}grid-template-areas:`, ...rows.map((row, i) => `${indent}  "${row}"${i === rows.length - 1 ? ";" : ""}`)];
-  };
+  const places = (view: View, indent: string) =>
+    inReadingOrder(layouts[view]).map(
+      (p) =>
+        `${indent}${selector} > .${p.block} { --row: ${p.row}; --rows: ${blockById(p.block)?.height ?? 1}; --column: ${p.column}; --span: ${p.width}; }`,
+    );
   return [
     `${selector} {`,
     "  display: grid;",
-    `  grid-template-columns: repeat(${NARROW_COLUMNS}, 1fr);`,
-    "  grid-auto-rows: auto;",
-    ...areas("narrow", "  "),
+    `  grid-template-columns: repeat(${NARROW_COLUMNS}, minmax(0, 1fr));`,
+    "  gap: 1rem;",
+    "  align-items: start;",
     "}",
+    "",
+    `${selector} > * {`,
+    "  grid-column: var(--column) / span var(--span);",
+    "  grid-row: var(--row) / span var(--rows);",
+    "}",
+    "",
+    "/* with <grid-flow>: one row; it pushes each block just below the ones above it in its columns */",
+    `${selector}[data-flowing] > * {`,
+    "  grid-row: 1;",
+    "}",
+    "",
+    ...places("narrow", ""),
     "",
     `@media (min-width: ${NARROW_BELOW}) {`,
     `  ${selector} {`,
-    `    grid-template-columns: repeat(${COLUMNS}, 1fr);`,
-    ...areas("wide", "    "),
+    `    grid-template-columns: repeat(${COLUMNS}, minmax(0, 1fr));`,
     "  }",
-    "}",
     "",
-    ...layouts.wide.map((p) => `${selector} > .${p.block} { grid-area: ${p.block}; }`),
+    ...places("wide", "  "),
+    "}",
   ].join("\n");
 };
+
+/** the markup that goes with layoutCss: one element per block, in the wide layout's reading order */
+export const layoutHtml = (layouts: Layouts, className = "layout") =>
+  [
+    `<grid-flow class="${className}">`,
+    ...inReadingOrder(layouts.wide).map((p) => `  <section class="${p.block}">${labelOf(p.block)}</section>`),
+    "</grid-flow>",
+  ].join("\n");
 
 /** parse a stored layout: drops unknown or repeated blocks, fits them inside, settles overlaps */
 export const parseLayout = (value: unknown, columns: Columns): Layout => {

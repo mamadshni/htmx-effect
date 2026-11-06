@@ -29,6 +29,9 @@ import {
   where,
 } from "../grid.js";
 
+// defines <grid-flow>, used by the pattern pages
+import "./grid-flow.js";
+
 declare const htmx: {
   ajax(verb: string, path: string, context: { target: string; swap: string; values: Record<string, string> }): Promise<void>;
 };

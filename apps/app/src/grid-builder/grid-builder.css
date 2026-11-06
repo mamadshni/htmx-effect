@@ -197,7 +197,6 @@
   margin-top: 0.5rem;
 }
 
-.grid-pattern__css pre,
 .grid-css {
   margin: 0.5rem 0 0;
   padding: 0.75rem;
@@ -231,21 +230,21 @@
   border-radius: 2px;
 }
 
-/* a saved pattern used as a page */
-.grid-page {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  grid-template-areas: var(--areas-narrow);
-  grid-auto-rows: minmax(4rem, auto);
-  gap: 1rem;
+/* a saved pattern used as a page: its grid comes from the pattern's own CSS (layoutCss) */
+.grid-page__text {
+  margin: 0;
+  padding: 0.25rem;
+  border-radius: 4px;
 }
 
-/* NARROW_BELOW in grid.ts */
-@media (min-width: 48rem) {
-  .grid-page {
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    grid-template-areas: var(--areas-wide);
-  }
+.grid-page__text:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+.grid-code-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: #57606a;
 }
 
 .grid-page__panel {
