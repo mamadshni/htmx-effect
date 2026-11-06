@@ -1,0 +1,49 @@
+/*
+ * <grid-flow>: the same for every layout; include it once, with grid-flow.ts.
+ *
+ * Each block carries its own place as custom properties on its style attribute, one set per
+ * screen size (inline styles cannot have media queries, so this file picks the set):
+ *
+ *   --narrow-column, --narrow-span, --narrow-row, --narrow-rows   (6 columns, below 48rem)
+ *   --wide-column,   --wide-span,   --wide-row,   --wide-rows     (12 columns, from 48rem)
+ *
+ * column and span are what count; row is the order (top to bottom), rows how many rows the
+ * block spans when grid-flow.ts is not loaded. With it ([data-flowing]), every block is in one
+ * row and the script pushes each one just below the blocks above it in its columns, so each
+ * block is as tall as its content.
+ *
+ * 48rem is NARROW_BELOW in grid.ts. The gap can be changed with --grid-flow-gap.
+ */
+
+grid-flow {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--grid-flow-gap, 1rem);
+  align-items: start;
+}
+
+grid-flow > * {
+  --column: var(--narrow-column, 1);
+  --span: var(--narrow-span, 6);
+  --row: var(--narrow-row, auto);
+  --rows: var(--narrow-rows, 1);
+  grid-column: var(--column) / span var(--span);
+  grid-row: var(--row) / span var(--rows);
+}
+
+grid-flow[data-flowing] > * {
+  grid-row: 1;
+}
+
+@media (min-width: 48rem) {
+  grid-flow {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  grid-flow > * {
+    --column: var(--wide-column, 1);
+    --span: var(--wide-span, 12);
+    --row: var(--wide-row, auto);
+    --rows: var(--wide-rows, 1);
+  }
+}

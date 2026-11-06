@@ -9,7 +9,6 @@
  * into the live region that stays on the page).
  */
 
-import { fromHtml } from "tsx-to-html";
 import { Layout } from "../layout.js";
 import { moduleAssets, type NavLink } from "../module.js";
 import {
@@ -22,7 +21,8 @@ import {
   gridArea,
   type Layout as GridLayout,
   type Layouts,
-  layoutCss,
+  blockStyle,
+  blocksInOrder,
   layoutHtml,
   NARROW_BELOW,
   NARROW_COLUMNS,
@@ -50,6 +50,15 @@ export const assets = moduleAssets("grid-builder", {
   styles: new URL("./grid-builder.css", import.meta.url),
   script: new URL("./client/grid-builder.ts", import.meta.url),
 });
+
+/** <grid-flow>'s stylesheet, the same for every pattern (served by routes.tsx) */
+export const flowStylesPath = "/assets/grid-builder/grid-flow.css" as const;
+const flowHead = (
+  <>
+    {assets.head}
+    <link rel="stylesheet" href={flowStylesPath} />
+  </>
+);
 
 export const blockId = (view: View, id: string) => `grid-block-${view}-${id}`;
 export const paletteId = (id: string) => `grid-palette-${id}`;
@@ -290,7 +299,7 @@ const PatternItem = ({ pattern, focus }: { pattern: Pattern; focus?: string | un
           </form>
         </div>
         <details class="grid-pattern__css">
-          <summary>CSS and HTML</summary>
+          <summary>HTML</summary>
           <Code layouts={pattern.layouts} />
         </details>
       </div>
@@ -309,19 +318,17 @@ const Mini = ({ layout, columns }: { layout: GridLayout; columns: Columns }) => 
   </div>
 );
 
-/** what to copy: the CSS, the markup, and where <grid-flow> comes from */
+/** what to copy: the markup (each block's place on its style), and the two files that go with every pattern */
 const Code = ({ layouts }: { layouts: Layouts }) => (
   <>
-    <pre class="grid-css">
-      <code>{layoutCss(layouts)}</code>
-    </pre>
+    <p class="grid-code-note">
+      Include once on the page: <a href={flowStylesPath}>grid-flow.css</a> (the same for every pattern) and{" "}
+      <code>src/grid-builder/client/grid-flow.ts</code> (makes each block as tall as its content; without it the
+      blocks still get their columns, on shared rows). Each block's place is on its <code>style</code>:
+    </p>
     <pre class="grid-css">
       <code>{layoutHtml(layouts)}</code>
     </pre>
-    <p class="grid-code-note">
-      With <code>src/grid-builder/client/grid-flow.ts</code> loaded, each block is as tall as its content. Without
-      it, the blocks still get their columns, on shared rows.
-    </p>
   </>
 );
 
@@ -332,11 +339,12 @@ const samples = [
 ];
 
 /**
- * A saved pattern used as a page: the same CSS and markup as the copy above (layoutCss inlined,
- * <grid-flow> from the module's script), with editable text in each block to try the heights.
+ * A saved pattern used as a page: the same markup as the copy above (grid-flow.css, <grid-flow>
+ * from the module's script, each block's place on its style), with editable text in each block
+ * to try the heights.
  */
 export const PatternPage = ({ pattern }: { pattern: Pattern }) => (
-  <Layout title={pattern.name} current={nav} head={assets.head}>
+  <Layout title={pattern.name} current={nav} head={flowHead}>
     <main class="page page--wide">
       <header class="intro">
         <h1>{pattern.name}</h1>
@@ -346,14 +354,15 @@ export const PatternPage = ({ pattern }: { pattern: Pattern }) => (
           <a href="/grid">Back to the grid builder</a>
         </p>
       </header>
-      {fromHtml(`<style>${layoutCss(pattern.layouts, ".grid-page")}</style>`)}
       <grid-flow class="grid-page">
-        {[...pattern.layouts.wide]
-          .sort((a, b) => a.row - b.row || a.column - b.column)
-          .map((p, i) => {
-            const block = blocks.find((b) => b.id === p.block);
+        {blocksInOrder(pattern.layouts).map((id, i) => {
+            const block = blocks.find((b) => b.id === id);
             return block ? (
-              <section class={`card grid-page__panel ${block.id}`} aria-labelledby={`panel-${block.id}`}>
+              <section
+                class={`card grid-page__panel ${block.id}`}
+                style={blockStyle(pattern.layouts, block.id)}
+                aria-labelledby={`panel-${block.id}`}
+              >
                 <h2 id={`panel-${block.id}`} class="card__title">
                   {block.label}
                 </h2>
@@ -364,9 +373,9 @@ export const PatternPage = ({ pattern }: { pattern: Pattern }) => (
             ) : null;
           })}
       </grid-flow>
-      <section class="card" aria-labelledby="pattern-css-title">
-        <h2 id="pattern-css-title" class="card__title">
-          CSS and HTML
+      <section class="card" aria-labelledby="pattern-html-title">
+        <h2 id="pattern-html-title" class="card__title">
+          HTML
         </h2>
         <Code layouts={pattern.layouts} />
       </section>

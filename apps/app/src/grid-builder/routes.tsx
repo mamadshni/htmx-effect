@@ -12,10 +12,10 @@ import { Effect, Layer, Option } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse, UrlParams } from "effect/http";
 import { toHtml } from "tsx-to-html";
 import { document } from "../layout.js";
-import type { AppModule } from "../module.js";
+import { type AppModule, fileRoute } from "../module.js";
 import { blockById, emptyLayouts, isView, type LayoutsResult, placeIn, removeFrom, resizeIn } from "./grid.js";
 import { currentLayouts, deletePattern, MAX_NAME, patternById, savePattern, setLayouts } from "./store.js";
-import { assets, blockId, Changed, GridPage, loadId, nav, paletteId, PatternPage } from "./views.js";
+import { assets, blockId, Changed, flowStylesPath, GridPage, loadId, nav, paletteId, PatternPage } from "./views.js";
 
 interface Outcome {
   readonly message: string;
@@ -114,5 +114,6 @@ export const GridBuilderModule: AppModule = {
     HttpRouter.add("POST", "/grid/delete", postDelete),
     HttpRouter.add("GET", "/grid/patterns/:id", patternPage),
     assets.routes,
+    fileRoute(flowStylesPath, new URL("./client/grid-flow.css", import.meta.url), "text/css; charset=utf-8"),
   ),
 };

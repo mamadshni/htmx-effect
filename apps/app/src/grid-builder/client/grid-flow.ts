@@ -3,9 +3,10 @@
  * the blocks above it in the columns it covers. A plain grid cannot do that: its rows are shared,
  * so one tall block makes its whole row (and everything spanning it) taller.
  *
- * Each child says where it goes with custom properties, set by the page's CSS (per breakpoint,
- * so media queries decide, not this script): --row (order: top to bottom), --column and --span
- * (columns, 1-based). Without this script, the CSS places the blocks on rows of their own.
+ * Each child says where it goes with custom properties: --row (order: top to bottom), --column
+ * and --span (columns, 1-based). grid-flow.css sets them from the --wide-* or --narrow-* values on
+ * the child's style attribute, per screen size, so media queries decide, not this script.
+ * Without this script, grid-flow.css places the blocks on rows of their own.
  *
  * With it, [data-flowing] puts every block in grid row 1 (aligned to the top), and this sets
  * each block's margin-top to just below the lowest block above it in its columns, plus the row
@@ -13,7 +14,7 @@
  * straight from the ResizeObserver callback: after layout, before paint, so nothing flickers.
  * Margins do not change a block's size, so this does not loop.
  *
- * Standalone: copy this file with a pattern's CSS to use the layout in another page.
+ * Standalone: copy this file and grid-flow.css to use a pattern in another page.
  */
 
 interface Item {

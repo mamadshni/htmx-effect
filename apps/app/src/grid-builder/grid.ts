@@ -3,11 +3,11 @@
  * the result live while dragging): the grids, the blocks, and where everything ends up.
  *
  * There are two layouts of the same blocks, edited separately: one for wide screens (12
- * columns) and one for narrow screens (6 columns). A pattern's CSS switches between them at
- * NARROW_BELOW. What a layout decides is the columns: where each block starts and how many
+ * columns) and one for narrow screens (6 columns); client/grid-flow.css switches between them
+ * at NARROW_BELOW. What a layout decides is the columns: where each block starts and how many
  * columns it spans. Rows only order the blocks: on a page, each row is as tall as its content.
  *
- * On a page (layoutCss with <grid-flow>), each block is as tall as its content and pushes down
+ * On a page (<grid-flow>, with blockStyle on each block), each block is as tall as its content and pushes down
  * only the blocks under it in its columns; blocks beside it keep their own height.
  *
  * A layout is a list of placements: a block, its top-left cell and its width in columns. Cells
@@ -23,7 +23,7 @@
 export const COLUMNS = 12;
 /** columns on narrow screens */
 export const NARROW_COLUMNS = 6;
-/** below this width the narrow layout is used (also in grid-builder.css, .grid-page) */
+/** below this width the narrow layout is used (also in client/grid-flow.css) */
 export const NARROW_BELOW = "48rem";
 /** empty rows drawn under a layout, to drop blocks below it */
 export const SPARE_ROWS = 3;
@@ -317,55 +317,29 @@ export const areasValue = (layout: Layout, columns: Columns) =>
 const inReadingOrder = (layout: Layout) => [...layout].sort((a, b) => a.row - b.row || a.column - b.column);
 
 /**
- * A stylesheet that recreates both layouts, to copy into another page with <grid-flow>
- * (client/grid-flow.ts): the narrow layout first, the wide one from NARROW_BELOW up.
- *
- * Each block gets its own place as custom properties: --column and --span (what counts), --row
- * (the order) and --rows. With <grid-flow>, each block is as tall as its content and only the
- * blocks under it, in its columns, move down. Without it, the same properties place the blocks
- * on shared rows, aligned to the top.
+ * A block's place in both layouts, for its style attribute: --wide-* and --narrow-* custom
+ * properties (column, span, row, rows). client/grid-flow.css, the same for every layout, picks
+ * one set per screen size; with client/grid-flow.ts each block is as tall as its content.
  */
-export const layoutCss = (layouts: Layouts, selector = ".layout") => {
-  const places = (view: View, indent: string) =>
-    inReadingOrder(layouts[view]).map(
-      (p) =>
-        `${indent}${selector} > .${p.block} { --row: ${p.row}; --rows: ${blockById(p.block)?.height ?? 1}; --column: ${p.column}; --span: ${p.width}; }`,
-    );
-  return [
-    `${selector} {`,
-    "  display: grid;",
-    `  grid-template-columns: repeat(${NARROW_COLUMNS}, minmax(0, 1fr));`,
-    "  gap: 1rem;",
-    "  align-items: start;",
-    "}",
-    "",
-    `${selector} > * {`,
-    "  grid-column: var(--column) / span var(--span);",
-    "  grid-row: var(--row) / span var(--rows);",
-    "}",
-    "",
-    "/* with <grid-flow>: one row; it pushes each block just below the ones above it in its columns */",
-    `${selector}[data-flowing] > * {`,
-    "  grid-row: 1;",
-    "}",
-    "",
-    ...places("narrow", ""),
-    "",
-    `@media (min-width: ${NARROW_BELOW}) {`,
-    `  ${selector} {`,
-    `    grid-template-columns: repeat(${COLUMNS}, minmax(0, 1fr));`,
-    "  }",
-    "",
-    ...places("wide", "  "),
-    "}",
-  ].join("\n");
-};
+export const blockStyle = (layouts: Layouts, id: string) =>
+  views
+    .flatMap((view) => {
+      const p = placementOf(layouts[view], id);
+      const rows = blockById(id)?.height ?? 1;
+      return p ? [`--${view}-column: ${p.column}; --${view}-span: ${p.width}; --${view}-row: ${p.row}; --${view}-rows: ${rows}`] : [];
+    })
+    .join("; ");
 
-/** the markup that goes with layoutCss: one element per block, in the wide layout's reading order */
-export const layoutHtml = (layouts: Layouts, className = "layout") =>
+/** the blocks of a layout in the order they are written: the wide layout's reading order */
+export const blocksInOrder = (layouts: Layouts) => inReadingOrder(layouts.wide).map((p) => p.block);
+
+/** the markup for a pattern: <grid-flow> and one element per block, its place on its style */
+export const layoutHtml = (layouts: Layouts) =>
   [
-    `<grid-flow class="${className}">`,
-    ...inReadingOrder(layouts.wide).map((p) => `  <section class="${p.block}">${labelOf(p.block)}</section>`),
+    "<grid-flow>",
+    ...blocksInOrder(layouts).map(
+      (id) => `  <section class="${id}" style="${blockStyle(layouts, id)}">${labelOf(id)}</section>`,
+    ),
     "</grid-flow>",
   ].join("\n");
 
