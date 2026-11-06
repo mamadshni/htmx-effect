@@ -1,31 +1,48 @@
 /**
  * The grid builder's rules, shared by the server (which decides) and the browser (which shows
- * the result live while dragging): the grid, the blocks, and where everything ends up.
+ * the result live while dragging): the grids, the blocks, and where everything ends up.
  *
- * There is one way to change the layout: put a block somewhere. Blocks never trade places.
+ * There are two layouts of the same blocks, edited separately: one for wide screens (12
+ * columns) and one for narrow screens (6 columns). A pattern's CSS switches between them at
+ * NARROW_BELOW. What a layout decides is the columns: where each block starts and how many
+ * columns it spans. Rows only order the blocks: on a page, each row is as tall as its content.
  *
- * The grid has 12 columns and as many rows as the layout needs. A layout is a list of
- * placements: a block and its top-left cell. Cells are 1-based, like CSS grid lines, so a
- * placement maps to `grid-area: <row> / <column> / span <height> / span <width>`.
+ * A layout is a list of placements: a block, its top-left cell and its width in columns. Cells
+ * are 1-based, like CSS grid lines, so a placement maps to
+ * `grid-area: <row> / <column> / span <height> / span <width>`.
  *
- * Nothing is ever refused for lack of room: a block put past the side snaps back inside the 12
- * columns, and blocks in the way are pushed down (and push the ones under them) to the first
- * rows where they fit. Blocks do not float back up, so gaps you leave stay.
+ * Two ways to change a layout: put a block somewhere, or make it wider or narrower. Nothing is
+ * ever refused for lack of room: a block past the side snaps back inside, and blocks in the way
+ * are pushed down (and push the ones under them) to the first rows where they fit. Blocks do
+ * not float back up, so gaps you leave stay.
  */
 
 export const COLUMNS = 12;
-/** empty rows drawn under the layout, to drop blocks below it */
+/** columns on narrow screens */
+export const NARROW_COLUMNS = 6;
+/** below this width the narrow layout is used (also in grid-builder.css, .grid-page) */
+export const NARROW_BELOW = "48rem";
+/** empty rows drawn under a layout, to drop blocks below it */
 export const SPARE_ROWS = 3;
-/** the board is never drawn shorter than this */
+/** a board is never drawn shorter than this */
 export const MIN_ROWS = 6;
+
+/** a grid's column count */
+export type Columns = typeof COLUMNS | typeof NARROW_COLUMNS;
+
+export type View = "wide" | "narrow";
+export const views: ReadonlyArray<View> = ["wide", "narrow"];
+export const isView = (value: string | undefined): value is View => views.includes(value as View);
+export const columnsOf = (view: View): Columns => (view === "wide" ? COLUMNS : NARROW_COLUMNS);
+export const viewLabel = (view: View) => (view === "wide" ? "wide screens" : "narrow screens");
 
 export interface Block {
   /** also its CSS grid-area name, so a valid CSS identifier */
   readonly id: string;
   readonly label: string;
-  /** in columns, at most COLUMNS */
+  /** its width when first placed in 12 columns (half of it, rounded up, in 6) */
   readonly width: number;
-  /** in rows */
+  /** rows it spans in the editor; on a page its height follows its content */
   readonly height: number;
 }
 
@@ -44,6 +61,9 @@ export const blocks: ReadonlyArray<Block> = [
 
 export const blockById = (id: string | undefined) => blocks.find((b) => b.id === id);
 
+/** a block's width when it is first placed in a grid */
+export const defaultWidth = (block: Block, columns: Columns) => Math.min(columns, Math.ceil((block.width * columns) / COLUMNS));
+
 export interface Cell {
   readonly column: number;
   readonly row: number;
@@ -51,22 +71,35 @@ export interface Cell {
 
 export interface Placement extends Cell {
   readonly block: string;
+  /** in columns */
+  readonly width: number;
 }
 
 export type Layout = ReadonlyArray<Placement>;
+
+/** both layouts of the same blocks */
+export interface Layouts {
+  readonly wide: Layout;
+  readonly narrow: Layout;
+}
+
+export const emptyLayouts: Layouts = { wide: [], narrow: [] };
 
 interface Rect extends Cell {
   readonly width: number;
   readonly height: number;
 }
 
-export const size = (block: Block) => `${block.width}×${block.height}`;
 export const where = ({ column, row }: Cell) => `row ${row}, column ${column}`;
 const labelOf = (id: string) => blockById(id)?.label ?? id;
+const columnsText = (n: number) => (n === 1 ? "1 column" : `${n} columns`);
 
-export const rectOf = (placement: Placement): Rect | undefined => {
-  const block = blockById(placement.block);
-  return block && { column: placement.column, row: placement.row, width: block.width, height: block.height };
+/** "6×3": columns × rows */
+export const size = (p: Placement) => `${p.width}×${blockById(p.block)?.height ?? 1}`;
+
+export const rectOf = (p: Placement): Rect | undefined => {
+  const block = blockById(p.block);
+  return block && { column: p.column, row: p.row, width: p.width, height: block.height };
 };
 
 const overlaps = (a: Rect, b: Rect) =>
@@ -86,12 +119,15 @@ export const gridArea = (p: Placement) => {
 /** the last row a block covers (0 for an empty layout) */
 export const height = (layout: Layout) => Math.max(0, ...layout.map((p) => p.row + (rectOf(p)?.height ?? 1) - 1));
 
-/** how many rows the board shows: the layout and some empty rows under it */
+/** how many rows a board shows: the layout and some empty rows under it */
 export const boardRows = (layout: Layout) => Math.max(MIN_ROWS, height(layout) + SPARE_ROWS);
 
-/** keep a block inside the 12 columns and below the top: it snaps to the nearest cell that is */
-export const snap = (block: Block, { column, row }: Cell): Cell => ({
-  column: Math.min(Math.max(1, column), COLUMNS - block.width + 1),
+/** a width that fits the grid */
+const fitWidth = (width: number, columns: Columns) => Math.min(Math.max(1, Math.round(width)), columns);
+
+/** keep a block inside the columns and below the top: it snaps to the nearest cell that is */
+export const snap = (width: number, { column, row }: Cell, columns: Columns): Cell => ({
+  column: Math.min(Math.max(1, column), columns - width + 1),
   row: Math.max(1, row),
 });
 
@@ -123,38 +159,52 @@ export const pushedDown = (before: Layout, after: Layout, id: string) =>
 export const listOf = (names: ReadonlyArray<string>) =>
   names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 
+const alsoMoved = (before: Layout, after: Layout, id: string) => {
+  const pushed = pushedDown(before, after, id);
+  return pushed.length > 0 ? ` ${listOf(pushed)} moved down.` : "";
+};
+
 export type Result =
   | { readonly ok: true; readonly layout: Layout; readonly message: string }
   | { readonly ok: false; readonly message: string };
 
-const fail = (message: string): Result => ({ ok: false, message });
+const fail = (message: string) => ({ ok: false, message }) as const;
 
-/** put a block (on the grid or not yet) with its top-left corner at `cell`, pushing others down */
-export const move = (layout: Layout, id: string, cell: Cell): Result => {
+/**
+ * Put a block (in the layout or not yet) with its top-left corner at `cell`, keeping its width
+ * (a new one gets its default width), pushing others down.
+ */
+export const move = (layout: Layout, id: string, cell: Cell, columns: Columns): Result => {
   const block = blockById(id);
   if (!block) return fail("There is no such block.");
-  const at = snap(block, cell);
-  const verb = placementOf(layout, id) ? "moved to" : "placed at";
-  const next = settle([{ block: id, ...at }], layout.filter((p) => p.block !== id));
-  const pushed = pushedDown(layout, next, id);
-  const also = pushed.length > 0 ? ` ${listOf(pushed)} moved down.` : "";
-  return { ok: true, layout: next, message: `${block.label} ${verb} ${where(at)}.${also}` };
+  const current = placementOf(layout, id);
+  const width = current?.width ?? defaultWidth(block, columns);
+  const at = snap(width, cell, columns);
+  const next = settle([{ block: id, width, ...at }], layout.filter((p) => p.block !== id));
+  const verb = current ? "moved to" : "placed at";
+  return { ok: true, layout: next, message: `${block.label} ${verb} ${where(at)}.${alsoMoved(layout, next, id)}` };
 };
 
-export const remove = (layout: Layout, id: string): Result => {
+/**
+ * Make a block `width` columns wide (at most the grid's), from its left edge; when that would go
+ * past the right side, it snaps left to fit. Blocks it now covers are pushed down.
+ */
+export const resize = (layout: Layout, id: string, width: number, columns: Columns): Result => {
   const block = blockById(id);
-  if (!block || !placementOf(layout, id)) return fail("That block is not on the grid.");
-  return { ok: true, layout: layout.filter((p) => p.block !== id), message: `${block.label} is back in the palette.` };
+  const current = placementOf(layout, id);
+  if (!block || !current) return fail("That block is not in this layout.");
+  const fitted = fitWidth(width, columns);
+  const at = snap(fitted, current, columns);
+  const next = settle([{ ...current, ...at, width: fitted }], layout.filter((p) => p.block !== id));
+  return { ok: true, layout: next, message: `${block.label} is ${columnsText(fitted)} wide.${alsoMoved(layout, next, id)}` };
 };
 
-/** the first free spot for a block (row by row); there always is one, at the latest under the layout */
-export const freeSpot = (layout: Layout, id: string): Cell => {
-  const block = blockById(id);
+/** the first free spot for a block of `width` (row by row); there always is one, at the latest under the layout */
+export const freeSpot = (layout: Layout, id: string, width: number, columns: Columns): Cell => {
   const others = layout.filter((p) => p.block !== id);
-  if (block)
-    for (let row = 1; row <= height(others) + 1; row++)
-      for (let column = 1; column + block.width - 1 <= COLUMNS; column++)
-        if (!collides({ block: id, column, row }, others)) return { column, row };
+  for (let row = 1; row <= height(others) + 1; row++)
+    for (let column = 1; column + width - 1 <= columns; column++)
+      if (!collides({ block: id, width, column, row }, others)) return { column, row };
   return { column: 1, row: height(others) + 1 };
 };
 
@@ -165,44 +215,143 @@ export const freeSpot = (layout: Layout, id: string): Cell => {
  */
 export const dropCell = (hover: Cell, grab: Cell): Cell => ({ column: hover.column - grab.column, row: hover.row - grab.row });
 
+/**
+ * A narrow layout made from a wide one, to start from: blocks half as wide (rounded up), in
+ * the same reading order (top to bottom, left to right). Each goes to the first free spot from
+ * its own row (or the previous block's, if lower); in that row, the free column closest to its
+ * own (halved); lower down, it wraps like text: the leftmost free column.
+ */
+export const narrowLayout = (wide: Layout): Layout => {
+  const placed: Array<Placement> = [];
+  let fromRow = 1;
+  for (const p of [...wide].sort((a, b) => a.row - b.row || a.column - b.column)) {
+    const width = Math.min(NARROW_COLUMNS, Math.ceil(p.width / 2));
+    const last = NARROW_COLUMNS - width + 1;
+    const wanted = Math.min(Math.ceil(p.column / 2), last);
+    const leftFirst = Array.from({ length: last }, (_, i) => i + 1);
+    const nearFirst = [...leftFirst].sort((a, b) => Math.abs(a - wanted) - Math.abs(b - wanted) || a - b);
+    const start = Math.max(p.row, fromRow);
+    for (let row = start; ; row++) {
+      const column = (row === start ? nearFirst : leftFirst).find(
+        (c) => !collides({ block: p.block, width, column: c, row }, placed),
+      );
+      if (column !== undefined) {
+        placed.push({ block: p.block, width, column, row });
+        fromRow = row;
+        break;
+      }
+    }
+  }
+  return placed;
+};
+
+// ---- both layouts: the same blocks in each ----
+
+export type LayoutsResult =
+  | { readonly ok: true; readonly layouts: Layouts; readonly message: string }
+  | { readonly ok: false; readonly message: string };
+
+const otherView = (view: View): View => (view === "wide" ? "narrow" : "wide");
+
+const withLayout = (layouts: Layouts, view: View, layout: Layout): Layouts =>
+  view === "wide" ? { ...layouts, wide: layout } : { ...layouts, narrow: layout };
+
+/**
+ * Put a block in one layout. A block that was in neither (from the palette) is also added to the
+ * other layout, under what is there, so both always have the same blocks.
+ */
+export const placeIn = (layouts: Layouts, view: View, id: string, cell: Cell): LayoutsResult => {
+  const result = move(layouts[view], id, cell, columnsOf(view));
+  if (!result.ok) return result;
+  let next = withLayout(layouts, view, result.layout);
+  let message = result.message;
+  const other = otherView(view);
+  if (!placementOf(layouts[other], id)) {
+    const width = defaultWidth(blockById(id)!, columnsOf(other));
+    next = withLayout(next, other, [...layouts[other], { block: id, width, column: 1, row: height(layouts[other]) + 1 }]);
+    message += ` It was also added at the bottom of the layout for ${viewLabel(other)}.`;
+  }
+  return { ok: true, layouts: next, message };
+};
+
+export const resizeIn = (layouts: Layouts, view: View, id: string, width: number): LayoutsResult => {
+  const result = resize(layouts[view], id, width, columnsOf(view));
+  return result.ok ? { ok: true, layouts: withLayout(layouts, view, result.layout), message: result.message } : result;
+};
+
+/** back to the palette: out of both layouts */
+export const removeFrom = (layouts: Layouts, id: string): LayoutsResult => {
+  const block = blockById(id);
+  if (!block || (!placementOf(layouts.wide, id) && !placementOf(layouts.narrow, id)))
+    return fail("That block is not on the grid.");
+  return {
+    ok: true,
+    layouts: { wide: layouts.wide.filter((p) => p.block !== id), narrow: layouts.narrow.filter((p) => p.block !== id) },
+    message: `${block.label} is back in the palette.`,
+  };
+};
+
+// ---- CSS ----
+
 /** the layout as grid-template-areas rows (as many as it is tall): a block's id in each cell it covers, "." elsewhere */
-export const templateAreas = (layout: Layout): ReadonlyArray<string> => {
-  const cells = Array.from({ length: height(layout) }, () => Array.from({ length: COLUMNS }, () => "."));
+export const templateAreas = (layout: Layout, columns: Columns): ReadonlyArray<string> => {
+  const cells = Array.from({ length: height(layout) }, () => Array.from({ length: columns }, () => "."));
   for (const p of layout) {
     const r = rectOf(p);
     if (!r) continue;
     for (let row = r.row; row < r.row + r.height; row++)
-      for (let column = r.column; column < r.column + r.width; column++) cells[row - 1]![column - 1] = p.block;
+      for (let column = r.column; column < Math.min(columns + 1, r.column + r.width); column++)
+        cells[row - 1]![column - 1] = p.block;
   }
   return cells.map((row) => row.join(" "));
 };
 
 /** the value of grid-template-areas, for a style attribute ("none" for an empty layout) */
-export const areasValue = (layout: Layout) => templateAreas(layout).map((row) => `"${row}"`).join(" ") || "none";
+export const areasValue = (layout: Layout, columns: Columns) =>
+  templateAreas(layout, columns).map((row) => `"${row}"`).join(" ") || "none";
 
-/** a stylesheet that recreates the layout, to copy into another page */
-export const layoutCss = (layout: Layout, selector = ".layout") =>
-  [
+/**
+ * A stylesheet that recreates both layouts, to copy into another page: the narrow one first,
+ * the wide one from NARROW_BELOW up. Rows are as tall as their content. Both use the same area
+ * names, so each block needs one grid-area rule.
+ */
+export const layoutCss = (layouts: Layouts, selector = ".layout") => {
+  const areas = (view: View, indent: string) => {
+    const rows = templateAreas(layouts[view], columnsOf(view));
+    return rows.length === 0
+      ? [`${indent}grid-template-areas: none;`]
+      : [`${indent}grid-template-areas:`, ...rows.map((row, i) => `${indent}  "${row}"${i === rows.length - 1 ? ";" : ""}`)];
+  };
+  return [
     `${selector} {`,
     "  display: grid;",
-    `  grid-template-columns: repeat(${COLUMNS}, 1fr);`,
+    `  grid-template-columns: repeat(${NARROW_COLUMNS}, 1fr);`,
     "  grid-auto-rows: auto;",
-    "  grid-template-areas:",
-    ...templateAreas(layout).map((row, i, rows) => `    "${row}"${i === rows.length - 1 ? ";" : ""}`),
+    ...areas("narrow", "  "),
     "}",
-    ...layout.map((p) => `${selector} > .${p.block} { grid-area: ${p.block}; }`),
+    "",
+    `@media (min-width: ${NARROW_BELOW}) {`,
+    `  ${selector} {`,
+    `    grid-template-columns: repeat(${COLUMNS}, 1fr);`,
+    ...areas("wide", "    "),
+    "  }",
+    "}",
+    "",
+    ...layouts.wide.map((p) => `${selector} > .${p.block} { grid-area: ${p.block}; }`),
   ].join("\n");
+};
 
-/** parse a stored layout: drops unknown or repeated blocks, snaps them inside, settles overlaps */
-export const parseLayout = (value: unknown): Layout => {
+/** parse a stored layout: drops unknown or repeated blocks, fits them inside, settles overlaps */
+export const parseLayout = (value: unknown, columns: Columns): Layout => {
   if (!Array.isArray(value)) return [];
   const placements: Array<Placement> = [];
   for (const item of value) {
     if (typeof item !== "object" || item === null) continue;
-    const { block, column, row } = item as Record<string, unknown>;
+    const { block, column, row, width } = item as Record<string, unknown>;
     const known = typeof block === "string" ? blockById(block) : undefined;
     if (!known || !Number.isInteger(column) || !Number.isInteger(row) || placementOf(placements, known.id)) continue;
-    placements.push({ block: known.id, ...snap(known, { column: column as number, row: row as number }) });
+    const w = fitWidth(Number.isInteger(width) ? (width as number) : defaultWidth(known, columns), columns);
+    placements.push({ block: known.id, width: w, ...snap(w, { column: column as number, row: row as number }, columns) });
   }
   return settle([], placements);
 };

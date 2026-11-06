@@ -1,16 +1,38 @@
 /**
- * Grid builder page: a grid of 12 columns and as many rows as needed, the blocks not on it (the
- * palette) and the saved patterns. Blocks are placed by number (grid-area: row / column / span),
- * so the browser can move them live while dragging; a saved pattern keeps the same layout as
- * grid-template-areas. client/grid-builder.ts does the dragging; every change is
- * a form post the server checks (routes.tsx). Answers to htmx are the whole workspace and the
- * status message (out of band, into the live region that stays on the page).
+ * Grid builder page: two editable layouts of the same blocks, one for wide screens (12 columns)
+ * and one for narrow screens (6 columns), the blocks in neither (the palette) and the saved
+ * patterns. A toggle (pure CSS, outside the workspace so htmx swaps keep it) shows one board at
+ * a time. Blocks are placed by number (grid-area: row / column / span), so the browser can move
+ * and resize them live; a saved pattern keeps both layouts as grid-template-areas.
+ * client/grid-builder.ts does the dragging; every change is a form post the server checks
+ * (routes.tsx). Answers to htmx are the whole workspace and the status message (out of band,
+ * into the live region that stays on the page).
  */
 
 import { Layout } from "../layout.js";
 import { moduleAssets, type NavLink } from "../module.js";
-import { areasValue, blocks, boardRows, COLUMNS, gridArea, type Layout as GridLayout, layoutCss, placementOf, rectOf, size, where } from "./grid.js";
-import { MAX_NAME, type Pattern, currentLayout, savedPatterns } from "./store.js";
+import {
+  areasValue,
+  blocks,
+  boardRows,
+  type Columns,
+  columnsOf,
+  COLUMNS,
+  gridArea,
+  type Layout as GridLayout,
+  type Layouts,
+  layoutCss,
+  NARROW_BELOW,
+  NARROW_COLUMNS,
+  placementOf,
+  rectOf,
+  size,
+  type View,
+  viewLabel,
+  views,
+  where,
+} from "./grid.js";
+import { currentLayouts, MAX_NAME, type Pattern, savedPatterns } from "./store.js";
 
 export const nav: NavLink = { href: "/grid", label: "Grid builder" };
 export const assets = moduleAssets("grid-builder", {
@@ -18,7 +40,7 @@ export const assets = moduleAssets("grid-builder", {
   script: new URL("./client/grid-builder.ts", import.meta.url),
 });
 
-export const blockId = (id: string) => `grid-block-${id}`;
+export const blockId = (view: View, id: string) => `grid-block-${view}-${id}`;
 export const paletteId = (id: string) => `grid-palette-${id}`;
 export const loadId = (pattern: string) => `grid-pattern-${pattern}-load`;
 
@@ -28,15 +50,28 @@ export const GridPage = () => (
       <header class="intro">
         <h1>Grid builder</h1>
         <p>
-          Drag blocks onto the grid to shape the page. The grid has 12 columns and grows downwards: blocks in the
-          way move down to make room, and a block dropped past the side snaps back inside. Save the layout as a
-          pattern to load it again, or copy its CSS.
+          Design the page twice: for wide screens on {COLUMNS} columns and for narrow screens on {NARROW_COLUMNS}{" "}
+          (below {NARROW_BELOW}). Both have the same blocks, each with its own place and width. Blocks in the way move
+          down to make room. What counts is the columns: rows only put the blocks in order, and on the page each row
+          is as tall as its content. Save both layouts as a pattern to load again, or copy its CSS.
         </p>
       </header>
       <p id="grid-help" class="grid-help">
-        Keyboard: Enter picks a block up, the arrow keys move it, Enter drops it, Escape
-        cancels. Delete takes a block off the grid.
+        Drag a block to move it, or its right edge to make it wider or narrower. Keyboard: Enter picks a block up,
+        the arrow keys move it, Enter drops it, Escape cancels; Shift + Left or Right makes it narrower or wider;
+        Delete takes it off the grid.
       </p>
+      <fieldset class="grid-view">
+        <legend class="field__label">Edit the layout for</legend>
+        <label>
+          <input type="radio" name="grid-view" id="grid-view-wide" value="wide" checked /> Wide screens: {COLUMNS}{" "}
+          columns
+        </label>
+        <label>
+          <input type="radio" name="grid-view" id="grid-view-narrow" value="narrow" /> Narrow screens:{" "}
+          {NARROW_COLUMNS} columns
+        </label>
+      </fieldset>
       <div id="grid-status" class="grid-status" role="status" aria-live="polite"></div>
       <Workspace />
     </main>
@@ -55,7 +90,7 @@ export const Changed = ({ message, focus }: { message: string; focus?: string | 
 
 /** `focus`: the id of the element to focus after the swap (htmx focuses [autofocus]) */
 const Workspace = ({ focus }: { focus?: string | undefined }) => {
-  const layout = currentLayout();
+  const layouts = currentLayouts();
   return (
     <div id="grid-workspace" class="grid-workspace" hx-target="this" hx-swap="outerHTML">
       <section class="card grid-board-card" aria-labelledby="grid-board-title">
@@ -65,94 +100,108 @@ const Workspace = ({ focus }: { focus?: string | undefined }) => {
           </h2>
           <form method="post" action="/grid/clear" hx-post="/grid/clear">
             <button id="grid-clear" class="button button--ghost" autofocus={focus === "grid-clear"}>
-              Clear grid
+              Clear both layouts
             </button>
           </form>
         </div>
-        <Board layout={layout} focus={focus} />
+        {views.map((view) => (
+          <Board view={view} layout={layouts[view]} focus={focus} />
+        ))}
       </section>
-      <Palette layout={layout} focus={focus} />
+      <Palette layouts={layouts} focus={focus} />
       <Patterns focus={focus} />
     </div>
   );
 };
 
-const Board = ({ layout, focus }: { layout: GridLayout; focus?: string | undefined }) => {
+/** the empty cells, drawn under the blocks: the pointer finds them while dragging */
+const Cells = ({ columns, rows }: { columns: Columns; rows: number }) =>
+  Array.from({ length: rows }, (_, r) =>
+    Array.from({ length: columns }, (_, c) => (
+      <div
+        class="grid-cell"
+        data-column={String(c + 1)}
+        data-row={String(r + 1)}
+        style={`grid-column: ${c + 1}; grid-row: ${r + 1}`}
+        aria-hidden="true"
+      ></div>
+    )),
+  );
+
+/** one layout's board; data-* tell the browser code which layout it is and what is in it */
+const Board = ({ view, layout, focus }: { view: View; layout: GridLayout; focus?: string | undefined }) => {
+  const columns = columnsOf(view);
   const rows = boardRows(layout);
   return (
-  <div
-    id="grid-board"
-    class="grid-board"
-    role="group"
-    aria-labelledby="grid-board-title"
-    data-layout={JSON.stringify(layout)}
-    style={`--columns: ${COLUMNS}; --rows: ${rows}`}
-  >
-    {/* the empty cells: drop targets, found under the pointer while dragging */}
-    {Array.from({ length: rows }, (_, r) =>
-      Array.from({ length: COLUMNS }, (_, c) => (
-        <div
-          class="grid-cell"
-          data-column={String(c + 1)}
-          data-row={String(r + 1)}
-          style={`grid-column: ${c + 1}; grid-row: ${r + 1}`}
-          aria-hidden="true"
-        ></div>
-      )),
-    )}
-    {layout.map((placement) => {
-      const block = blocks.find((b) => b.id === placement.block);
-      return block ? (
-        <button
-          type="button"
-          id={blockId(block.id)}
-          class="grid-block"
-          data-block={block.id}
-          style={`grid-area: ${gridArea(placement)}`}
-          aria-describedby="grid-help"
-          autofocus={focus === blockId(block.id)}
-        >
-          <span class="grid-block__label">{block.label}</span>
-          <span class="grid-block__size">{size(block)}</span>
-          <span class="visually-hidden">, {where(placement)}</span>
-        </button>
-      ) : null;
-    })}
-    <div class="grid-preview" aria-hidden="true" hidden></div>
-  </div>
+    <div class={`grid-view-${view}`}>
+      <div
+        id={`grid-board-${view}`}
+        class={`grid-board grid-board--${view}`}
+        role="group"
+        aria-label={`Layout for ${viewLabel(view)}, ${columns} columns`}
+        data-view={view}
+        data-columns={String(columns)}
+        data-layout={JSON.stringify(layout)}
+        style={`--columns: ${columns}; --rows: ${rows}`}
+      >
+        <Cells columns={columns} rows={rows} />
+        {layout.map((placement) => {
+          const block = blocks.find((b) => b.id === placement.block);
+          return block ? (
+            <button
+              type="button"
+              id={blockId(view, block.id)}
+              class="grid-block"
+              data-block={block.id}
+              style={`grid-area: ${gridArea(placement)}`}
+              aria-describedby="grid-help"
+              autofocus={focus === blockId(view, block.id)}
+            >
+              <span class="grid-block__label">{block.label}</span>
+              <span class="grid-block__size">{size(placement)}</span>
+              <span class="visually-hidden">, {where(placement)}</span>
+              {/* drag it to change the width; the keyboard way is Shift + Left / Right */}
+              <span class="grid-block__resize" aria-hidden="true"></span>
+            </button>
+          ) : null;
+        })}
+        <div class="grid-preview" aria-hidden="true" hidden></div>
+      </div>
+    </div>
   );
 };
 
-const Palette = ({ layout, focus }: { layout: GridLayout; focus?: string | undefined }) => {
-  const unplaced = blocks.filter((b) => !placementOf(layout, b.id));
+const Palette = ({ layouts, focus }: { layouts: Layouts; focus?: string | undefined }) => {
+  const unplaced = blocks.filter((b) => !placementOf(layouts.wide, b.id));
   return (
     <section class="card grid-palette" data-palette aria-labelledby="grid-palette-title">
       <h2 id="grid-palette-title" class="card__title">
         Blocks
       </h2>
-      <p class="card__lead">Drag one onto the grid. Drag a block here to take it off.</p>
+      <p class="card__lead">
+        Drag one onto the grid: it is added to both layouts. Drag a block here to take it off both.
+      </p>
       {unplaced.length === 0 ? (
         <p class="grid-palette__empty">Every block is on the grid.</p>
       ) : (
         <ul class="grid-palette__list">
-          {unplaced.map((block) => {
-            return (
-              <li>
-                <button
-                  type="button"
-                  id={paletteId(block.id)}
-                  class="grid-block grid-block--palette"
-                  data-block={block.id}
-                  style={`--w: ${block.width}; --h: ${block.height}`}
-                  aria-describedby="grid-help"
-                  autofocus={focus === paletteId(block.id)}
-                >
-                  <span class="grid-block__label">{block.label}</span>
-                  <span class="grid-block__size">{size(block)}</span>
-                </button>
-              </li>
-            );
-          })}
+          {unplaced.map((block) => (
+            <li>
+              <button
+                type="button"
+                id={paletteId(block.id)}
+                class="grid-block grid-block--palette"
+                data-block={block.id}
+                aria-describedby="grid-help"
+                autofocus={focus === paletteId(block.id)}
+              >
+                <span class="grid-block__label">{block.label}</span>
+                <span class="grid-block__size">
+                  {block.width}×{block.height}
+                </span>
+              </button>
+            </li>
+          ))}
         </ul>
       )}
     </section>
@@ -166,7 +215,7 @@ const Patterns = ({ focus }: { focus?: string | undefined }) => (
     </h2>
     <form class="grid-save" method="post" action="/grid/save" hx-post="/grid/save">
       <label for="grid-save-name" class="field__label">
-        Save the layout as
+        Save both layouts as
       </label>
       <div class="grid-save__row">
         <input
@@ -192,14 +241,19 @@ const Patterns = ({ focus }: { focus?: string | undefined }) => (
 
 const PatternItem = ({ pattern, focus }: { pattern: Pattern; focus?: string | undefined }) => {
   const nameId = `grid-pattern-${pattern.id}-name`;
+  const count = pattern.layouts.wide.length;
   return (
     <li class="grid-pattern">
-      <Mini layout={pattern.layout} />
+      <div class="grid-minis">
+        {views.map((view) => (
+          <Mini layout={pattern.layouts[view]} columns={columnsOf(view)} />
+        ))}
+      </div>
       <div class="grid-pattern__body">
         <p class="grid-pattern__name">
           <strong id={nameId}>{pattern.name}</strong>{" "}
           <span class="grid-pattern__count">
-            {pattern.layout.length} {pattern.layout.length === 1 ? "block" : "blocks"}
+            {count} {count === 1 ? "block" : "blocks"}
           </span>
         </p>
         <div class="button-row">
@@ -227,7 +281,7 @@ const PatternItem = ({ pattern, focus }: { pattern: Pattern; focus?: string | un
         <details class="grid-pattern__css">
           <summary>CSS</summary>
           <pre>
-            <code>{layoutCss(pattern.layout)}</code>
+            <code>{layoutCss(pattern.layouts)}</code>
           </pre>
         </details>
       </div>
@@ -236,8 +290,12 @@ const PatternItem = ({ pattern, focus }: { pattern: Pattern; focus?: string | un
 };
 
 /** a small picture of a layout */
-const Mini = ({ layout }: { layout: GridLayout }) => (
-  <div class="grid-mini" style={`grid-template-areas: ${areasValue(layout)}`} aria-hidden="true">
+const Mini = ({ layout, columns }: { layout: GridLayout; columns: Columns }) => (
+  <div
+    class="grid-mini"
+    style={`--columns: ${columns}; grid-template-areas: ${areasValue(layout, columns)}`}
+    aria-hidden="true"
+  >
     {layout.map((p) => (rectOf(p) ? <div class="grid-mini__block" style={`grid-area: ${p.block}`}></div> : null))}
   </div>
 );
@@ -249,11 +307,16 @@ export const PatternPage = ({ pattern }: { pattern: Pattern }) => (
       <header class="intro">
         <h1>{pattern.name}</h1>
         <p>
-          The saved pattern as a page layout. <a href="/grid">Back to the grid builder</a>
+          The saved pattern as a page layout: {NARROW_COLUMNS} columns below {NARROW_BELOW}, {COLUMNS} from there up.
+          Each row is as tall as its content. <a href="/grid">Back to the grid builder</a>
         </p>
       </header>
-      <div class="grid-page" style={`grid-template-areas: ${areasValue(pattern.layout)}`}>
-        {pattern.layout.map((p) => {
+      {/* both layouts as custom properties; grid-builder.css picks one by screen width */}
+      <div
+        class="grid-page"
+        style={`--areas-wide: ${areasValue(pattern.layouts.wide, COLUMNS)}; --areas-narrow: ${areasValue(pattern.layouts.narrow, NARROW_COLUMNS)}`}
+      >
+        {pattern.layouts.wide.map((p) => {
           const block = blocks.find((b) => b.id === p.block);
           return block ? (
             <section class="card grid-page__panel" style={`grid-area: ${block.id}`}>
@@ -267,7 +330,7 @@ export const PatternPage = ({ pattern }: { pattern: Pattern }) => (
           CSS
         </h2>
         <pre class="grid-css">
-          <code>{layoutCss(pattern.layout)}</code>
+          <code>{layoutCss(pattern.layouts)}</code>
         </pre>
       </section>
     </main>
