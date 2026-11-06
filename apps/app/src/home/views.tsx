@@ -1,4 +1,5 @@
 import { Layout } from "../layout.js";
+import { moduleAssets, type NavLink } from "../module.js";
 import { Field, Section } from "../ui.js";
 
 const countries = [
@@ -14,8 +15,11 @@ const countries = [
   "Switzerland",
 ];
 
+export const nav: NavLink = { href: "/", label: "Home" };
+export const assets = moduleAssets("home", { styles: new URL("./home.css", import.meta.url) });
+
 export const Page = ({ items }: { items: ReadonlyArray<string> }) => (
-  <Layout title="Home" current="home">
+  <Layout title="Home" current={nav} head={assets.head}>
     <main class="page">
       <h1>Components</h1>
 

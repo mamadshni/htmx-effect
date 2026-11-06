@@ -1,0 +1,215 @@
+/* filters module styles, served at /assets/filters/styles.css and linked by its pages. */
+
+/* ---- filters ---- */
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.filter-notes {
+  margin: -0.5rem 0 0;
+  padding-inline-start: 1.25rem;
+  color: #656d76;
+}
+
+/* the disclosure panel: below its button (the popover's invoker is its anchor) */
+.filter-panel {
+  position-area: block-end span-inline-end;
+  position-try-fallbacks: flip-block;
+  inset: auto;
+  margin: 0.25rem 0;
+  padding: 0.75rem 1rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+}
+
+.filter-panel:popover-open {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.filter-panel__legend {
+  float: left; /* keeps the legend inside the panel's padding */
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+}
+
+.filter-panel__option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.filter-panel__option input {
+  inline-size: 1.1rem;
+  block-size: 1.1rem;
+  margin: 0;
+}
+
+.filter-panel__apply {
+  justify-self: start;
+  margin-top: 0.5rem;
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.filter-chips:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.filter-chips__empty {
+  color: #656d76;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.25rem 0.2rem 0.75rem;
+  font-size: 0.9rem;
+  background: #dbeafe;
+  border-radius: 999px;
+}
+
+.filter-chip__remove {
+  display: grid;
+  place-items: center;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  padding: 0;
+  font: inherit;
+  line-height: 1;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.filter-chip__remove:hover {
+  background: rgb(0 0 0 / 0.08);
+}
+
+.filter-chip__remove:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+/* C: a chip is two buttons, its label (opens the editor) and × */
+.filter-chip--editable {
+  padding-inline-start: 0.25rem;
+}
+
+.filter-chip__edit {
+  padding: 0.15rem 0.5rem;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.filter-chip__edit:hover,
+.filter-chip__edit[aria-expanded="true"] {
+  background: rgb(0 0 0 / 0.08);
+}
+
+.filter-chip__edit:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+/* the editor dialog: below its chip (the popover's invoker is its anchor) */
+.filter-editor {
+  position-area: block-end span-inline-end;
+  position-try-fallbacks: flip-block;
+  inset: auto;
+  min-inline-size: 14rem;
+  margin: 0.25rem 0;
+  padding: 0.75rem 1rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+}
+
+/* a filter not set yet has no chip: under + Add filter (its invoker, the menu item, is gone) */
+#chips-add {
+  anchor-name: --chips-add;
+}
+
+.filter-editor--fresh {
+  position-anchor: --chips-add;
+}
+
+.filter-editor form {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.filter-editor__title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.filter-editor__group {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.filter-editor__input,
+.filter-editor input[role="combobox"] {
+  inline-size: 100%;
+  padding: 0.4rem 0.5rem;
+  font: inherit;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.filter-editor__actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.filter-results {
+  inline-size: 100%;
+}
+
+.filter-results__title {
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+}
+
+.filter-results__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.filter-results__list li {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.6rem 0;
+  border-block-start: 1px solid var(--border);
+}
+
+.filter-results__meta {
+  font-size: 0.85rem;
+  color: #656d76;
+}

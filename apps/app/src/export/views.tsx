@@ -7,13 +7,20 @@
  */
 
 import { Layout } from "../layout.js";
+import { moduleAssets, type NavLink } from "../module.js";
 import { fileName } from "./csv.js";
 import { orders } from "./db.js";
+
+export const nav: NavLink = { href: "/export", label: "Export" };
+export const assets = moduleAssets("export", {
+  styles: new URL("./export.css", import.meta.url),
+  script: new URL("./client/export.ts", import.meta.url),
+});
 
 const money = new Intl.NumberFormat("en", { style: "currency", currency: "EUR" });
 
 export const ExportPage = () => (
-  <Layout title="Export" current="export" head={<script type="module" src="/assets/export.js"></script>}>
+  <Layout title="Export" current={nav} head={assets.head}>
     <main class="page">
       <header class="intro">
         <h1>Export</h1>

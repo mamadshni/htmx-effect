@@ -1,0 +1,24 @@
+/* calendar module styles, served at /assets/calendar/styles.css and linked by its pages. */
+
+/* ---- showcase pages ---- */
+
+.toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+.toc a {
+  color: var(--accent);
+}
+
+.section-title {
+  margin: 1.5rem 0 1rem;
+  font-size: 1.35rem;
+}
+
+.table-title {
+  margin: 0.5rem 0 0;
+  font-size: 0.95rem;
+}

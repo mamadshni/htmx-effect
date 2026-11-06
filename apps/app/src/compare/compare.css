@@ -1,0 +1,121 @@
+/* compare module styles, served at /assets/compare/styles.css and linked by its pages. */
+
+/* ---- cally vs ours ---- */
+
+.api-table--wrap td:not(:last-child) {
+  white-space: normal;
+}
+
+.compare__sides {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 30rem), 1fr));
+  gap: 1.25rem;
+  inline-size: 100%;
+}
+
+.compare__side {
+  display: grid;
+  gap: 1rem;
+  min-inline-size: 0;
+}
+
+.compare__label {
+  margin: 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #656d76;
+}
+
+.compare__missing {
+  margin: 0;
+  padding: 1rem;
+  color: #656d76;
+  background: var(--bg);
+  border-radius: 6px;
+}
+
+/* a light theme on cally's CSS parts on the compare page, close to ours (cally's own styles do the rest) */
+.compare :is(calendar-date, calendar-range, calendar-multi) {
+  font-size: 0.9rem;
+}
+
+.compare :is(calendar-date, calendar-range, calendar-multi)::part(header) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-block-end: 0.5rem;
+}
+
+.compare :is(calendar-date, calendar-range, calendar-multi)::part(heading) {
+  font-weight: 600;
+}
+
+.compare :is(calendar-date, calendar-range, calendar-multi)::part(button) {
+  padding: 0.25rem 0.6rem;
+  font: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.compare :is(calendar-date, calendar-range, calendar-multi)::part(disabled) {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.compare :is(calendar-select-month, calendar-select-year)::part(label) {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.compare :is(calendar-select-month, calendar-select-year)::part(select) {
+  padding: 0.25rem 0.4rem;
+  font: inherit;
+  font-weight: 400;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.compare calendar-month {
+  --color-accent: var(--accent);
+  --color-text-on-accent: #fff;
+}
+
+.compare calendar-month::part(button) {
+  border-radius: 6px;
+}
+
+.compare calendar-month::part(today) {
+  font-weight: 700;
+}
+
+.compare calendar-month::part(disallowed) {
+  text-decoration: line-through;
+}
+
+.compare calendar-month::part(range-inner) {
+  color: var(--text);
+  background: #dbeafe;
+  border-radius: 0;
+}
+
+.compare calendar-month::part(range-start) {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.compare calendar-month::part(range-end) {
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+}
+
+.compare calendar-month::part(range-start range-end) {
+  border-radius: 6px;
+}

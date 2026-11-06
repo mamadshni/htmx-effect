@@ -5,26 +5,38 @@ import { fileURLToPath } from "node:url";
 import { NodeHttpServer, NodeRuntime } from "@effect/platform-node";
 import { Layer } from "effect";
 import { HttpRouter, HttpServerResponse, HttpStaticServer } from "effect/http";
-import { CalendarRoutes } from "./calendar/routes.js";
-import { CompareRoutes } from "./compare/routes.js";
-import { ExportRoutes } from "./export/routes.js";
-import { FiltersRoutes } from "./filters/routes.js";
-import { HomeRoutes } from "./home/routes.js";
-import { RangePickerRoutes } from "./range-picker/routes.js";
+import { CalendarModule } from "./calendar/routes.js";
+import { CompareModule } from "./compare/routes.js";
+import { ExportModule } from "./export/routes.js";
+import { FiltersModule } from "./filters/routes.js";
+import { GridBuilderModule } from "./grid-builder/routes.js";
+import { HomeModule } from "./home/routes.js";
+import { setNavigation } from "./layout.js";
+import type { AppModule } from "./module.js";
+import { RangePickerModule } from "./range-picker/routes.js";
 
 const require = createRequire(import.meta.url);
 
-/** scripts and styles: htmx, cally, the app's own, and the design system's bundle */
-const Assets = Layer.mergeAll(
+/**
+ * The app's modules, in navigation order. Each one is a folder under src/ that serves its own
+ * pages, styles and scripts: adding or removing a module is its folder and its line here.
+ */
+const modules: ReadonlyArray<AppModule> = [
+  HomeModule,
+  CalendarModule,
+  CompareModule,
+  RangePickerModule,
+  FiltersModule,
+  ExportModule,
+  GridBuilderModule,
+];
+
+/** what every page loads (see layout.tsx): htmx, the shared styles, the design system's bundle */
+const SharedAssets = Layer.mergeAll(
   HttpRouter.add(
     "GET",
     "/assets/htmx.js",
     HttpServerResponse.file(require.resolve("htmx.org/dist/htmx.min.js")),
-  ),
-  HttpRouter.add(
-    "GET",
-    "/assets/cally.js",
-    HttpServerResponse.file(fileURLToPath(import.meta.resolve("cally"))),
   ),
   HttpStaticServer.layer({
     root: fileURLToPath(new URL("../public", import.meta.url)),
@@ -38,9 +50,9 @@ const Assets = Layer.mergeAll(
   }),
 );
 
-HttpRouter.serve(
-  Layer.mergeAll(HomeRoutes, CalendarRoutes, CompareRoutes, RangePickerRoutes, FiltersRoutes, ExportRoutes, Assets),
-).pipe(
+setNavigation(modules.flatMap((m) => (m.nav ? [m.nav] : [])));
+
+HttpRouter.serve(Layer.mergeAll(SharedAssets, ...modules.map((m) => m.routes))).pipe(
   Layer.provide(NodeHttpServer.layer(createServer, { port: Number(process.env.PORT ?? 3000) })),
   Layer.launch,
   NodeRuntime.runMain,

@@ -1,0 +1,61 @@
+/* home module styles, served at /assets/home/styles.css and linked by its pages. */
+
+/* ---- search dialog ---- */
+
+.search-dialog {
+  width: min(28rem, calc(100vw - 2rem));
+  padding: 1.25rem;
+  border: 0;
+  border-radius: var(--radius);
+  box-shadow: 0 20px 50px rgb(0 0 0 / 0.2);
+}
+
+.search-dialog::backdrop {
+  background: rgb(15 23 42 / 0.35);
+}
+
+.search-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.search-dialog__header h2 {
+  font-size: 1.125rem;
+}
+
+/* ---- bottom sheets (home) ---- */
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: 0.25rem 0.75rem;
+}
+
+.sheet-header h2 {
+  font-size: 1.125rem;
+}
+
+.sheet-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sheet-list li {
+  padding: 0.85rem 0;
+  border-block-start: 1px solid var(--border);
+}
+
+.sheet-form {
+  display: grid;
+  gap: 0.75rem;
+}

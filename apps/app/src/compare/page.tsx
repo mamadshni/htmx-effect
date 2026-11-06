@@ -1,8 +1,14 @@
 /** cally and our calendar side by side: one card per scenario, each side with its code and events. */
 
 import { Layout } from "../layout.js";
+import { moduleAssets, type NavLink } from "../module.js";
 import { EventLogScript, ExampleBody } from "../showcase/example.js";
 import { scenarios, type Scenario } from "./scenarios.js";
+
+export const nav: NavLink = { href: "/compare", label: "cally vs ours" };
+export const assets = moduleAssets("compare", { styles: new URL("./compare.css", import.meta.url) });
+/** cally itself, from node_modules (served by routes.tsx) */
+export const callyPath = "/assets/compare/cally.js" as const;
 
 /** the facts that do not show in a demo */
 const differences: ReadonlyArray<readonly [string, string, string]> = [
@@ -18,7 +24,16 @@ const differences: ReadonlyArray<readonly [string, string, string]> = [
 ];
 
 export const ComparePage = () => (
-  <Layout title="cally vs ours" current="compare" head={<script type="module" src="/assets/cally.js"></script>}>
+  <Layout
+    title="cally vs ours"
+    current={nav}
+    head={
+      <>
+        {assets.head}
+        <script type="module" src={callyPath}></script>
+      </>
+    }
+  >
     <main class="page page--wide">
       <header class="intro">
         <h1>cally vs ours</h1>

@@ -1,6 +1,7 @@
 /** The calendar showcase: the API as tables, then live examples with their code and events. */
 
 import { Layout } from "../layout.js";
+import { moduleAssets, type NavLink } from "../module.js";
 import {
   containerInputs,
   containerMembers,
@@ -15,6 +16,9 @@ import {
 import { EventLogScript, ExampleCard } from "../showcase/example.js";
 import { calendarExamples, pickerExamples } from "./examples.js";
 
+export const nav: NavLink = { href: "/calendar", label: "Calendar" };
+export const assets = moduleAssets("calendar", { styles: new URL("./calendar.css", import.meta.url) });
+
 const contents = [
   ["inputs", "Inputs"],
   ["outputs", "Outputs"],
@@ -23,7 +27,7 @@ const contents = [
 ] as const;
 
 export const CalendarPage = () => (
-  <Layout title="Calendar" current="calendar">
+  <Layout title="Calendar" current={nav} head={assets.head}>
     <main class="page page--wide">
       <header class="intro">
         <h1>Calendar</h1>

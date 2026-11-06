@@ -9,9 +9,11 @@
 import { Effect, Layer, Option } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse, UrlParams } from "effect/http";
 import { toHtml } from "tsx-to-html";
+import { document } from "../layout.js";
+import type { AppModule } from "../module.js";
 import { chipId, ChipsChanged, removeId } from "./chips.js";
 import { activeFilters, editedFields, fieldById, isVariant, removeField, saveField, saveFilters, type Variant } from "./store.js";
-import { Changed, FiltersPage } from "./views.js";
+import { assets, Changed, FiltersPage, nav } from "./views.js";
 
 /**
  * After a chip's × removed its filter, that button is gone: focus the next chip's × (or the
@@ -75,9 +77,13 @@ const postChips = Effect.gen(function* () {
   return HttpServerResponse.html(toHtml(<ChipsChanged message={message} focus={focus} />));
 }).pipe(Effect.catch(() => Effect.succeed(HttpServerResponse.text("Bad form", { status: 400 }))));
 
-export const FiltersRoutes = Layer.mergeAll(
-  // rendered per request: it shows the saved filters
-  HttpRouter.add("GET", "/filters", Effect.sync(() => HttpServerResponse.html(`<!doctype html>${toHtml(<FiltersPage />)}`))),
-  HttpRouter.add("POST", "/filters/chips", postChips),
-  HttpRouter.add("POST", "/filters/:variant", post),
-);
+export const FiltersModule: AppModule = {
+  nav,
+  routes: Layer.mergeAll(
+    // rendered per request: it shows the saved filters
+    HttpRouter.add("GET", nav.href, Effect.sync(() => document(<FiltersPage />))),
+    HttpRouter.add("POST", "/filters/chips", postChips),
+    HttpRouter.add("POST", "/filters/:variant", post),
+    assets.routes,
+  ),
+};

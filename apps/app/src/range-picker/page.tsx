@@ -1,19 +1,21 @@
 /** <app-range-picker>: a cally range calendar with relative presets, as in the design. */
 
 import { Layout } from "../layout.js";
+import { moduleAssets, type NavLink } from "../module.js";
 import { EventLogScript, ExampleCard } from "../showcase/example.js";
 import { examples } from "./examples.js";
+
+export const nav: NavLink = { href: "/range-picker", label: "Range presets" };
+export const assets = moduleAssets("range-picker", {
+  styles: new URL("./range-picker.css", import.meta.url),
+  script: new URL("./client/range-picker.ts", import.meta.url),
+});
 
 export const RangePickerPage = () => (
   <Layout
     title="Range presets"
-    current="range-picker"
-    head={
-      <>
-        <link rel="stylesheet" href="/assets/app/range-picker.css" />
-        <script type="module" src="/assets/range-picker.js"></script>
-      </>
-    }
+    current={nav}
+    head={assets.head}
   >
     <main class="page page--wide">
       <header class="intro">

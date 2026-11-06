@@ -16,6 +16,7 @@
  */
 
 import { Layout } from "../layout.js";
+import { moduleAssets, type NavLink } from "../module.js";
 import { ChipsExample } from "./chips.js";
 import { activeFilters, filters, isActive, tasks, visibleTasks, type Filter, type Task, type Variant } from "./store.js";
 
@@ -197,8 +198,11 @@ const Example = ({ v, title, children }: { v: Variant; title: string; children: 
   </section>
 );
 
+export const nav: NavLink = { href: "/filters", label: "Filters" };
+export const assets = moduleAssets("filters", { styles: new URL("./filters.css", import.meta.url) });
+
 export const FiltersPage = () => (
-  <Layout title="Filters" current="filters">
+  <Layout title="Filters" current={nav} head={assets.head}>
     <main class="page">
       <header class="intro">
         <h1>Filters</h1>

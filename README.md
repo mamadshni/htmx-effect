@@ -56,3 +56,4 @@ Dates are `YYYY-MM-DD` strings in attributes and form values, and `Temporal.Plai
 | `/compare` | [cally](https://github.com/WickyNilliams/cally) next to our calendar, scenario by scenario |
 | `/filters` | The same htmx filter form two ways, to compare with a screen reader: native checkboxes in a disclosure (recommended) and a menu of submit buttons; then chips whose label opens an editor `<dialog popover>` under them (checkboxes, combobox or text, Apply / Cancel); each example saves its own filters |
 | `/range-picker` | `<app-range-picker>`: cally range calendar with relative presets (app code, not the design system) |
+| `/grid` | Grid builder: drag blocks of different sizes onto a CSS grid of 12 columns that grows downwards; blocks in the way are pushed down, a drop past the side snaps inside, save layouts as `grid-template-areas` patterns, open one as a page (`/grid/patterns/:id`) |
