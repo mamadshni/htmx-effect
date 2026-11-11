@@ -118,11 +118,17 @@ const Workspace = ({ focus }: { focus?: string | undefined }) => {
           <h2 id="grid-board-title" class="card__title">
             Layout
           </h2>
-          <form method="post" action="/grid/clear" hx-post="/grid/clear">
-            <button id="grid-clear" class="button button--ghost" autofocus={focus === "grid-clear"}>
-              Clear both layouts
+          <div class="grid-toolbar__actions">
+            {/* plays the shown layout as Tetris (client/tetris.ts) */}
+            <button type="button" id="grid-tetris" class="button button--ghost" data-tetris>
+              Play Tetris
             </button>
-          </form>
+            <form method="post" action="/grid/clear" hx-post="/grid/clear">
+              <button id="grid-clear" class="button button--ghost" autofocus={focus === "grid-clear"}>
+                Clear both layouts
+              </button>
+            </form>
+          </div>
         </div>
         {views.map((view) => (
           <Board view={view} layout={layouts[view]} focus={focus} />

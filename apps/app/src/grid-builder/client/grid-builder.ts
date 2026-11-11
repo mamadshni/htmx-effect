@@ -31,6 +31,7 @@ import {
 
 // defines <grid-flow>, used by the pattern pages
 import "./grid-flow.js";
+import { isPlaying, startTetris } from "./tetris.js";
 
 declare const htmx: {
   ajax(verb: string, path: string, context: { target: string; swap: string; values: Record<string, string> }): Promise<void>;
@@ -143,7 +144,7 @@ interface PointerDrag {
 let drag: PointerDrag | undefined;
 
 document.addEventListener("pointerdown", (event) => {
-  if (event.button !== 0 || drag || carry) return;
+  if (event.button !== 0 || drag || carry || isPlaying()) return;
   const target = event.target as Element;
   const el = target.closest<HTMLElement>(BLOCK);
   const block = blockById(el?.dataset["block"]);
@@ -261,7 +262,23 @@ const endCarry = () => {
   carry = undefined;
 };
 
+// "Play Tetris" (in the Layout toolbar) plays the shown layout as Tetris (client/tetris.ts);
+// delegated, so it keeps working after htmx swaps the workspace
+document.addEventListener("click", (event) => {
+  if (!(event.target as Element).closest("[data-tetris]") || isPlaying() || drag) return;
+  const board = shownBoard();
+  if (!board) return;
+  endCarry();
+  startTetris({
+    view: board.view,
+    columns: board.columns,
+    say,
+    keep: (layout) => post("/grid/replace", { view: board.view, layout: JSON.stringify(layout) }),
+  });
+});
+
 document.addEventListener("keydown", (event) => {
+  if (isPlaying()) return;
   const el = (event.target as Element).closest<HTMLElement>(BLOCK);
   const id = el?.dataset["block"];
   const board = el && boardOf(el);
