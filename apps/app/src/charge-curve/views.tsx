@@ -1,214 +1,530 @@
 /**
- * Graph page: the charging curve (Ladekurve) of a charging session, drawn with D3 by
- * <charge-curve> (client/charge-curve.ts). The server renders the samples as JSON inside the
- * element; the element draws them and redraws whenever they change.
+ * Graph module pages, from the charging database (db/ChargingDb.ts):
+ * - the list of charging sessions (Ladevorgänge), with a form to plug a car in
+ * - a session's detail page with its charging curve in <charge-chart>, fed by <data> children
+ *   and drawn with D3 (first on the server, then in the browser on each change)
  *
- * Two examples: a finished session, and a live one that htmx polls (`hx-trigger="every 2s"`).
- * Each poll swaps only the JSON (so the slider and focus stay where they are) and the status
- * line (out of band). When the session is over the server answers 286 and htmx stops polling.
+ * While a session charges, its page holds a hidden poller that asks every 2 s for the readings
+ * after the last one it has (`after`). The answer is out-of-band swaps only: the new readings as
+ * <data> appended to the chart (which then updates its SVG with D3), the session's figures, and
+ * a new poller with the new `after` (without a trigger once the session has finished).
  */
 
 import { Layout } from "../layout.js";
 import { moduleAssets, type NavLink } from "../module.js";
-import {
-  LIVE_MINUTES_PER_SECOND,
-  LIVE_POLL_SECONDS,
-  liveElapsed,
-  MIN_LIVE_MINUTES,
-  type Sample,
-  SESSION_MINUTES,
-  samplesUntil,
-  session,
-} from "./data.js";
+import { ChargeChart, ChargeChartElement, SampleData } from "./chart.js";
+import type { SessionView } from "./db/ChargingDb.js";
+import type { Reading, Station } from "./db/schema.js";
+import { type CurveName, clock, curveNames, DEFAULT_GAP_MINUTES, kwhText, kwText, type Sample } from "./draw.js";
+import { dateTime, duration, time, toSamples } from "./time.js";
 
 export const nav: NavLink = { href: "/graph", label: "Graph" };
 export const assets = moduleAssets("charge-curve", {
   styles: new URL("./charge-curve.css", import.meta.url),
-  script: new URL("./client/charge-curve.ts", import.meta.url),
+  script: new URL("./client/charge-chart.ts", import.meta.url),
 });
 
-const LIVE_DATA_ID = "live-curve-data";
-const LIVE_STATUS_ID = "live-curve-status";
+export const sessionHref = (id: string) => `/graph/sessions/${encodeURIComponent(id)}`;
+export const compareHref = "/graph/compare";
 
-const kwh = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const kw = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-const clock = (minute: number) =>
-  `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
+/** how often a charging session's page asks for new readings */
+const POLL_SECONDS = 2;
+/** a charging session shows a placeholder until its readings span this many minutes */
+const MIN_LIVE_MINUTES = 3;
 
-/** the samples as JSON for <charge-curve> (never executed: type application/json) */
-const SamplesJson = ({ samples, id }: { samples: ReadonlyArray<Sample>; id?: string }) => (
-  // the JSX types only allow module/importmap; a data block is valid HTML
-  <script {...({ type: "application/json" } as object)} id={id} data-samples>
-    {/* "<" escaped so the JSON can never close the script element */}
-    {JSON.stringify(samples).replaceAll("<", "\\u003c")}
-  </script>
-);
+/** cars the start form offers */
+export const vehicles = [
+  { id: "id3", name: "VW ID.3", batteryKwh: 58, vehicleMaxKw: 11 },
+  { id: "zoe", name: "Renault Zoe", batteryKwh: 52, vehicleMaxKw: 22 },
+  { id: "model3", name: "Tesla Model 3", batteryKwh: 57.5, vehicleMaxKw: 11 },
+  { id: "kona", name: "Hyundai Kona", batteryKwh: 64, vehicleMaxKw: 7.2 },
+  { id: "500e", name: "Fiat 500e", batteryKwh: 37.3, vehicleMaxKw: 11 },
+] as const;
 
-export const GraphPage = ({ liveStart }: { liveStart: number }) => (
-  <Layout title="Graph" current={nav} head={assets.head}>
-    <main class="page page--wide">
+const percent = (share: number) => `${Math.round(share * 100)} %`;
+const kwh = (value: number) => kwhText({ minute: 0, kw: 0, kwh: value });
+const kw = (value: number) => kwText({ minute: 0, kw: value, kwh: 0 });
+
+/** "Lädt" or "Beendet"; with `id` a poll can replace it (out of band) */
+const StatusBadge = ({ view, id, oob }: { view: SessionView; id?: string; oob?: boolean }) => {
+  const live = view.session.status === "charging";
+  return (
+    <span id={id} class={live ? "curve-badge curve-badge--live" : "curve-badge"} hx-swap-oob={oob ? "true" : undefined}>
+      {live ? <span class="curve-status__dot curve-status__dot--live" aria-hidden="true"></span> : null}
+      {live ? "Lädt" : "Beendet"}
+    </span>
+  );
+};
+
+// ---- list ----
+
+export const SessionsPage = ({
+  sessions,
+  stations,
+}: {
+  sessions: ReadonlyArray<SessionView>;
+  stations: ReadonlyArray<Station>;
+}) => (
+  <Layout title="Ladevorgänge" current={nav} head={assets.head}>
+    <main class="page" lang="de">
       <header class="intro">
-        <h1>Ladekurve</h1>
+        <h1>Ladevorgänge</h1>
         <p>
-          The charging curve of a charging session, drawn with D3: charging power (kW, right scale) and energy
-          charged (kWh, left scale). Move the slider with the mouse, by dragging on touch, or focus the chart
-          and use the arrow keys (Shift or Page Up/Down: 10 minutes, Home/End: start/end).
+          Charging sessions from the charging database (a JSON file read through an Effect service). Open one to see
+          its charging curve; start a new one to watch it live.
+        </p>
+        <p>
+          <a href={compareHref}>Darstellungen vergleichen →</a> (interpolation, readings as points)
         </p>
       </header>
 
-      <section class="card" lang="de" aria-labelledby="curve-title">
-        <h2 id="curve-title" class="card__title">
-          Abgeschlossener Ladevorgang
+      <section class="card" aria-labelledby="sessions-title">
+        <h2 id="sessions-title" class="card__title">
+          Alle Ladevorgänge
         </h2>
-        <charge-curve class="charge-curve" aria-label="Ladekurve des Ladevorgangs">
-          <SamplesJson samples={session} />
-        </charge-curve>
-        <SampleTable samples={session} />
+        <div class="table-scroll">
+          <table class="api-table curve-sessions">
+            <thead>
+              <tr>
+                <th scope="col">Start</th>
+                <th scope="col">Wallbox</th>
+                <th scope="col">Fahrzeug</th>
+                <th scope="col" class="curve-number">
+                  Dauer
+                </th>
+                <th scope="col" class="curve-number">
+                  Lademenge
+                </th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sessions.map((view) => (
+                <tr>
+                  <th scope="row">
+                    <a href={sessionHref(view.session.id)}>{dateTime(view.session.startedAt, view.station.timeZone)}</a>
+                  </th>
+                  <td>{view.station.name}</td>
+                  <td>{view.session.vehicle}</td>
+                  <td class="curve-number">
+                    {duration(view.session.startedAt, view.session.endedAt ?? view.lastReadingAt ?? view.session.startedAt)}
+                  </td>
+                  <td class="curve-number">{kwh(view.energyKwh)}</td>
+                  <td>
+                    <StatusBadge view={view} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
-      <LiveCard start={liveStart} />
-
+      <StartForm stations={stations} />
       <Notes />
     </main>
   </Layout>
 );
 
-/**
- * The live example. The card polls itself, swapping only the JSON inside the chart; the
- * restart button replaces the whole card with a new session.
- */
-export const LiveCard = ({ start }: { start: number }) => (
-  <section
-    class="card"
-    lang="de"
-    aria-labelledby="live-title"
-    hx-get={`/graph/live?start=${start}`}
-    hx-trigger={`every ${LIVE_POLL_SECONDS}s`}
-    hx-target={`#${LIVE_DATA_ID}`}
-    hx-swap="outerHTML"
-  >
-    <div class="curve-header">
-      <h2 id="live-title" class="card__title">
-        Live-Ladevorgang
-      </h2>
-      <button
-        type="button"
-        class="button button--ghost"
-        hx-get="/graph/live-card"
-        hx-target="closest section"
-        hx-swap="outerHTML"
-      >
-        Neu starten
+/** plug a car in: POST /graph/sessions, then on to the new session's page */
+const StartForm = ({ stations }: { stations: ReadonlyArray<Station> }) => (
+  <section class="card" aria-labelledby="start-title">
+    <h2 id="start-title" class="card__title">
+      Ladevorgang starten
+    </h2>
+    <p class="card__lead">
+      A simulated wallbox then sends meter readings into the database until the car reaches its target: every few
+      seconds while the power changes, otherwise after 1 to 20 minutes. In time-lapse: one reading a second.
+    </p>
+    <form class="curve-start" method="post" action="/graph/sessions">
+      <label class="field">
+        <span class="field__label">Wallbox</span>
+        <select name="station" required>
+          {stations.map((s) => (
+            <option value={s.id}>{`${s.name} (${kw(s.maxKw)})`}</option>
+          ))}
+        </select>
+      </label>
+      <label class="field">
+        <span class="field__label">Fahrzeug</span>
+        <select name="vehicle" required>
+          {vehicles.map((v) => (
+            <option value={v.id}>{v.name}</option>
+          ))}
+        </select>
+      </label>
+      <label class="field">
+        <span class="field__label">Ladestand (%)</span>
+        <input name="startSoc" type="number" min="0" max="95" step="5" value="30" required />
+      </label>
+      <label class="field">
+        <span class="field__label">Ziel (%)</span>
+        <input name="targetSoc" type="number" min="10" max="100" step="5" value="80" required />
+      </label>
+      <button type="submit" class="button">
+        Starten
       </button>
-    </div>
-    <LiveStatus elapsed={liveElapsed(start)} />
-    <charge-curve class="charge-curve" aria-label="Ladekurve des laufenden Ladevorgangs" min-minutes={MIN_LIVE_MINUTES} live>
-      <SamplesJson samples={samplesUntil(liveElapsed(start))} id={LIVE_DATA_ID} />
-    </charge-curve>
+    </form>
   </section>
 );
 
-const LiveStatus = ({ elapsed, oob }: { elapsed: number; oob?: boolean }) => {
-  const samples = samplesUntil(elapsed);
-  const last = samples.at(-1);
-  const done = elapsed >= SESSION_MINUTES;
+// ---- detail ----
+
+const chartId = (sessionId: string) => `chart-${sessionId}`;
+const factsId = (sessionId: string) => `facts-${sessionId}`;
+const pollerId = (sessionId: string) => `poller-${sessionId}`;
+const badgeId = (sessionId: string) => `status-${sessionId}`;
+
+export const SessionPage = ({ view, readings }: { view: SessionView; readings: ReadonlyArray<Reading> }) => {
+  const { session, station } = view;
+  const live = session.status === "charging";
+  const samples = toSamples(session, station, readings);
   return (
-    <p id={LIVE_STATUS_ID} class="curve-status" hx-swap-oob={oob ? "true" : undefined}>
-      <span class={done ? "curve-status__dot" : "curve-status__dot curve-status__dot--live"} aria-hidden="true"></span>
-      {done ? "Beendet" : "Lädt"} · {elapsed} min · {kwh.format(last?.kwh ?? 0)} kWh · {kw.format(last?.kw ?? 0)} kW
-      <span class="curve-status__note">
-        (simuliert: {LIVE_MINUTES_PER_SECOND} min pro Sekunde, Abfrage alle {LIVE_POLL_SECONDS} s)
-      </span>
-    </p>
+    <Layout title={`Ladevorgang ${session.id}`} current={nav} head={assets.head}>
+      <main class="page" lang="de">
+        <header class="intro">
+          <p class="curve-back">
+            <a href={nav.href}>← Ladevorgänge</a>
+          </p>
+          <h1>
+            {session.vehicle} · {station.name}
+          </h1>
+        </header>
+
+        <section class="card" aria-labelledby="curve-title">
+          <div class="curve-header">
+            <h2 id="curve-title" class="card__title">
+              Ladekurve
+            </h2>
+            <StatusBadge view={view} id={badgeId(session.id)} />
+          </div>
+          <p class="card__lead">
+            <a href={`${compareHref}?session=${encodeURIComponent(session.id)}`}>Darstellungen vergleichen →</a>
+          </p>
+          <Facts view={view} />
+          <ChargeChart
+            id={chartId(session.id)}
+            label={`Ladekurve von ${session.vehicle} an ${station.name}`}
+            samples={samples}
+            live={live}
+            minMinutes={live ? MIN_LIVE_MINUTES : 0}
+          />
+          {live ? <Poller sessionId={session.id} after={readings.at(-1)?.at ?? ""} done={false} /> : null}
+          <SampleTable samples={samples} />
+        </section>
+      </main>
+    </Layout>
   );
 };
 
-/** a poll's answer: the new JSON (swapped into the chart) and the status line (out of band) */
-export const LiveUpdate = ({ elapsed }: { elapsed: number }) => (
-  <>
-    <SamplesJson samples={samplesUntil(elapsed)} id={LIVE_DATA_ID} />
-    <LiveStatus elapsed={elapsed} oob />
-  </>
+/** the session's figures; a poll replaces them (out of band) while it charges */
+const Facts = ({ view, oob }: { view: SessionView; oob?: boolean }) => {
+  const { session, station } = view;
+  const until = session.endedAt ?? view.lastReadingAt ?? session.startedAt;
+  return (
+    <dl id={factsId(session.id)} class="curve-facts" hx-swap-oob={oob ? "true" : undefined}>
+      <div>
+        <dt>Start</dt>
+        <dd>{dateTime(session.startedAt, station.timeZone)}</dd>
+      </div>
+      <div>
+        <dt>{session.endedAt ? "Ende" : "Letzter Messwert"}</dt>
+        <dd>{view.lastReadingAt || session.endedAt ? time(until, station.timeZone) : "–"}</dd>
+      </div>
+      <div>
+        <dt>Dauer</dt>
+        <dd>{duration(session.startedAt, until)}</dd>
+      </div>
+      <div>
+        <dt>Lademenge</dt>
+        <dd>{kwh(view.energyKwh)}</dd>
+      </div>
+      <div>
+        <dt>Spitzenleistung</dt>
+        <dd>{kw(view.peakKw)}</dd>
+      </div>
+      <div>
+        <dt>Ladestand</dt>
+        <dd>
+          {percent(session.startSoc)} → {percent(Math.min(session.targetSoc, session.startSoc + view.energyKwh / session.batteryKwh))}
+        </dd>
+      </div>
+    </dl>
+  );
+};
+
+/**
+ * The hidden element that polls. Each answer replaces it with one that asks from the newest
+ * reading; once the session has finished the new one has no trigger, so polling stops.
+ */
+const Poller = ({ sessionId, after, done, oob }: { sessionId: string; after: string; done: boolean; oob?: boolean }) => (
+  <div
+    id={pollerId(sessionId)}
+    hidden
+    hx-get={`${sessionHref(sessionId)}/readings?after=${encodeURIComponent(after)}`}
+    hx-trigger={done ? undefined : `every ${POLL_SECONDS}s`}
+    hx-swap="none"
+    hx-swap-oob={oob ? "true" : undefined}
+  ></div>
 );
 
-/** the same values as a table, every 10 minutes and the last sample (for screen readers and a quick check) */
-const SampleTable = ({ samples }: { samples: ReadonlyArray<Sample> }) => {
-  const rows = samples.filter((s, i) => s.minute % 10 === 0 || i === samples.length - 1);
+/**
+ * A poll's answer: the readings after `after` as <data>, appended to the chart out of band, the
+ * figures, the status and the next poller. The last one (the session has finished) replaces the
+ * chart instead: its x-axis then ends at the last reading.
+ */
+export const ReadingsUpdate = ({
+  view,
+  fresh,
+  all,
+  after,
+}: {
+  view: SessionView;
+  fresh: ReadonlyArray<Reading>;
+  /** every reading, for the last answer: the chart is replaced once with its finished version */
+  all: ReadonlyArray<Reading>;
+  after: string;
+}) => {
+  const { session, station } = view;
+  const done = session.status !== "charging";
+  // `after` stays when nothing is new
   return (
-    <details class="curve-table">
-      <summary>Werte als Tabelle</summary>
-      <div class="table-scroll">
-        <table class="api-table">
-          <thead>
-            <tr>
-              <th scope="col">Uhrzeit</th>
-              <th scope="col" class="curve-number">
-                Ladeleistung
-              </th>
-              <th scope="col" class="curve-number">
-                Lademenge
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((s) => (
-              <tr>
-                <th scope="row">{clock(s.minute)}</th>
-                <td class="curve-number">{kw.format(s.kw)} kW</td>
-                <td class="curve-number">{kwh.format(s.kwh)} kWh</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </details>
+    <>
+      {done ? (
+        <ChargeChartElement
+          id={chartId(session.id)}
+          label={`Ladekurve von ${session.vehicle} an ${station.name}`}
+          samples={toSamples(session, station, all)}
+          oob
+        />
+      ) : fresh.length > 0 ? (
+        <div hx-swap-oob={`beforeend:#${chartId(session.id)}`}>
+          {toSamples(session, station, fresh).map((sample) => (
+            <SampleData sample={sample} />
+          ))}
+        </div>
+      ) : null}
+      <Facts view={view} oob />
+      <StatusBadge view={view} id={badgeId(session.id)} oob />
+      <Poller sessionId={session.id} after={fresh.at(-1)?.at ?? after} done={done} oob />
+    </>
   );
 };
 
-/** how each acceptance criterion and open question is answered here */
+/** "12 s", "2 min 30 s", "20 min" */
+const interval = (minutes: number) => {
+  const seconds = Math.round(minutes * 60);
+  if (seconds < 60) return `${seconds} s`;
+  return seconds % 60 === 0 ? `${seconds / 60} min` : `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
+};
+
+/** every reading, with the time since the one before (the meter reports at irregular times) */
+const SampleTable = ({ samples }: { samples: ReadonlyArray<Sample> }) => (
+  <details class="curve-table">
+    <summary>Messwerte als Tabelle ({samples.length})</summary>
+    <div class="table-scroll">
+      <table class="api-table">
+        <thead>
+          <tr>
+            <th scope="col">Uhrzeit</th>
+            <th scope="col" class="curve-number">
+              Abstand
+            </th>
+            <th scope="col" class="curve-number">
+              Ladeleistung
+            </th>
+            <th scope="col" class="curve-number">
+              Lademenge
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {samples.map((s, i) => {
+            const previous = samples[i - 1];
+            const gap = previous ? s.minute - previous.minute : 0;
+            return (
+              <tr class={gap > DEFAULT_GAP_MINUTES ? "curve-table__gap" : undefined}>
+                <th scope="row">{clock(s.minute)}</th>
+                <td class="curve-number">{previous ? interval(gap) : "–"}</td>
+                <td class="curve-number">{kwText(s)}</td>
+                <td class="curve-number">{kwhText(s)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  </details>
+);
+
 const Notes = () => (
-  <section class="card" aria-labelledby="notes-title">
+  <section class="card" lang="en" aria-labelledby="notes-title">
     <h2 id="notes-title" class="card__title">
-      Acceptance criteria and open questions
+      How it works
     </h2>
     <ul class="curve-notes">
       <li>
-        <strong>Two lines, two scales with labels, legend, gradient area, horizontal grid lines:</strong> done. Both
-        scales get the same number of ticks (nice steps such as 2, 2.5, 3, 4, 5), so one set of grid lines fits both.
+        <strong>Database:</strong> a JSON file with three tables (stations, sessions, readings: meter readings at
+        irregular times, seconds to 20 minutes apart). <code>ChargingDb</code> is an Effect service: every query reads the file through Effect's FileSystem
+        and decodes it with Schema; writes replace it atomically, one at a time. Errors are typed (
+        <code>DbError</code>, <code>SessionNotFound</code>).
       </li>
       <li>
-        <strong>Slider with arrow keys:</strong> the chart is one focusable <code>role="slider"</code>; its value
-        text reads time, kW and kWh. The slider marks where it crosses both curves.
+        <strong>Charger:</strong> a background fiber stands in for the wallboxes: for each session still charging it
+        writes the next reading (power ramps up, holds, tapers off above 90 %) and ends the session at the target. It
+        reports like a real meter: when the power changes by 0.5 kW, else when a random 1–20 minute heartbeat is due.
+        The chart joins readings more than 5 minutes apart with a dashed line: nothing was measured there.
       </li>
       <li>
-        <strong>Tooltip:</strong> it belongs to the slider, not to hover, so it works the same for mouse, touch and
-        keyboard.
+        <strong>Chart:</strong> <code>&lt;charge-chart&gt;</code> takes its samples from <code>&lt;data&gt;</code>{" "}
+        children and redraws with keyed D3 joins when children are added; the server draws the first SVG with the same
+        code.
       </li>
       <li>
-        <strong>Grey vertical bands:</strong> dynamic. The time unit is the smallest of 5, 10, 15, 30, 60, 120
-        minutes that gives at most 8 bands (4 on narrow screens); the x-axis ticks use the same unit.
-      </li>
-      <li>
-        <strong>Mobile:</strong> under 520 px the chart is lower, the axis titles go (the units stay in the tick
-        labels), there are fewer ticks and the legend wraps. Below about 280 px it is still readable but little more.
-        Touch: a horizontal drag moves the slider, a vertical one scrolls the page (<code>touch-action: pan-y</code>);
-        the tooltip sits at the top of the chart so the finger does not cover it.
-      </li>
-      <li>
-        <strong>Live (htmx):</strong> <code>hx-trigger="every 2s"</code> polls; the server answers 286 when the
-        session is over and htmx stops. Other options: <code>load delay:2s</code> on the response (the server decides
-        each next interval), or server-sent events with the SSE extension.
-      </li>
-      <li>
-        <strong>Minimum extent:</strong> the x-axis spans at least 30 minutes and each y-axis at least 1, so a session
-        that just started is not stretched across the whole chart. Before {MIN_LIVE_MINUTES} minutes of samples a
-        placeholder is shown instead of a curve.
-      </li>
-      <li>
-        <strong>Note:</strong> two y-scales make crossing points look meaningful when they are not (where kW crosses
-        kWh depends only on the scales). If that confuses users, two stacked charts sharing the time axis are the
-        alternative.
+        <strong>Live:</strong> a charging session's page asks every 2 s for the readings after its newest one; the
+        answer appends them as <code>&lt;data&gt;</code> (<code>hx-swap-oob="beforeend:#…"</code>) and replaces the
+        figures and the poller, which has no trigger once the session has finished.
       </li>
     </ul>
   </section>
 );
+
+// ---- showcase: ways to draw the chart ----
+
+const curveInfo: Record<CurveName, { readonly d3: string; readonly text: string }> = {
+  linear: { d3: "curveLinear", text: "Gerade Strecken zwischen den Messwerten: exakt, aber eckig. (Standard)" },
+  monotone: {
+    d3: "curveMonotoneX",
+    text: "Glatt und durch jeden Messwert, ohne Überschwingen: steigende kWh bleiben steigend.",
+  },
+  "step-after": {
+    d3: "curveStepAfter",
+    text: "Jeder Wert gilt bis zum nächsten Messwert: zeigt, was zuletzt gemessen wurde.",
+  },
+  step: { d3: "curveStep", text: "Der Wert wechselt jeweils in der Mitte zwischen zwei Messwerten." },
+  natural: {
+    d3: "curveNatural",
+    text: "Natürlicher kubischer Spline: sehr glatt, schwingt an Ecken über (Leistung über dem Maximum, unter 0).",
+  },
+  cardinal: { d3: "curveCardinal", text: "Kardinal-Spline: durch jeden Messwert, schwingt an Ecken über." },
+  "catmull-rom": {
+    d3: "curveCatmullRom",
+    text: "Zentripetaler Catmull-Rom: durch jeden Messwert, schwingt weniger über als cardinal.",
+  },
+  basis: {
+    d3: "curveBasis",
+    text: "B-Spline: am glattesten, geht aber nicht durch die Messwerte; Ecken werden abgeschnitten.",
+  },
+};
+
+const COMPARE_CHART_ID = "compare-chart";
+
+/**
+ * One chart and the ways to draw it: which session, which interpolation, readings as points or
+ * not, gaps between readings dashed or solid. Those selects change the chart in place (its
+ * `curve`, `points` and `gaps` attributes, see client/charge-chart.ts) and the address with
+ * them; picking another session
+ * loads the page for it. Without JavaScript, "Anzeigen" submits the same choice.
+ */
+export const ComparePage = ({
+  sessions,
+  view,
+  readings,
+  curve,
+  points,
+  gaps,
+}: {
+  sessions: ReadonlyArray<SessionView>;
+  view: SessionView;
+  readings: ReadonlyArray<Reading>;
+  curve: CurveName;
+  points: boolean;
+  gaps: "dashed" | "solid";
+}) => {
+  const { session, station } = view;
+  return (
+    <Layout title="Darstellungen vergleichen" current={nav} head={assets.head}>
+      <main class="page" lang="de">
+        <header class="intro">
+          <p class="curve-back">
+            <a href={nav.href}>← Ladevorgänge</a>
+          </p>
+          <h1>Darstellungen vergleichen</h1>
+          <p>
+            Dieselben Messwerte, anders gezeichnet. Die Wallbox meldet unregelmäßig (alle paar Sekunden, solange sich die
+            Leistung ändert, sonst nach 1 bis 20 Minuten): mit Punkten sieht man, wo wirklich gemessen wurde und was die
+            Interpolation dazwischen erfindet. Die übrigen Seiten zeichnen immer linear, ohne Punkte.
+          </p>
+        </header>
+
+        <section class="card" aria-labelledby="compare-title">
+          <h2 id="compare-title" class="card__title">
+            {session.vehicle} · {station.name}
+          </h2>
+          <form class="curve-controls" method="get" action={compareHref}>
+            <label class="field">
+              <span class="field__label">Ladevorgang</span>
+              <select name="session" data-submit>
+                {sessions.map((s) => (
+                  <option value={s.session.id} selected={s.session.id === session.id || undefined}>
+                    {`${dateTime(s.session.startedAt, s.station.timeZone)} · ${s.session.vehicle}${s.session.status === "charging" ? " (lädt)" : ""}`}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label class="field">
+              <span class="field__label">Interpolation</span>
+              <select name="curve" data-chart={COMPARE_CHART_ID} data-chart-attribute="curve">
+                {curveNames.map((name) => (
+                  <option
+                    value={name}
+                    selected={name === curve || undefined}
+                    data-description={curveInfo[name].text}
+                  >{`${name} · d3.${curveInfo[name].d3}`}</option>
+                ))}
+              </select>
+            </label>
+            <label class="field">
+              <span class="field__label">Messpunkte</span>
+              <select name="points" data-chart={COMPARE_CHART_ID} data-chart-attribute="points">
+                <option value="" selected={!points || undefined}>
+                  Nur Linie
+                </option>
+                <option value="on" selected={points || undefined}>
+                  Linie mit Punkten
+                </option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="field__label">Lücken (über {DEFAULT_GAP_MINUTES} min)</span>
+              <select name="gaps" data-chart={COMPARE_CHART_ID} data-chart-attribute="gaps">
+                <option value="" selected={gaps === "dashed" || undefined}>
+                  Gestrichelt
+                </option>
+                <option value="solid" selected={gaps === "solid" || undefined}>
+                  Durchgezogen
+                </option>
+              </select>
+            </label>
+            <noscript>
+              <button type="submit" class="button">
+                Anzeigen
+              </button>
+            </noscript>
+          </form>
+          <p class="curve-description" data-describes="curve" aria-live="polite">
+            {curveInfo[curve].text}
+          </p>
+          <ChargeChart
+            id={COMPARE_CHART_ID}
+            label={`Ladekurve von ${session.vehicle} an ${station.name}`}
+            samples={toSamples(session, station, readings)}
+            curve={curve}
+            points={points}
+            gaps={gaps}
+          />
+        </section>
+      </main>
+    </Layout>
+  );
+};

@@ -42,8 +42,18 @@ declare global {
 
     // design-system elements: only their HTML attributes (class getters/methods are not attributes)
     interface IntrinsicElements {
-      /** the graph module's chart (src/charge-curve/client): samples as a JSON child */
-      "charge-curve": HtmlProps & { "min-minutes"?: number; live?: boolean };
+      /** the graph module's chart (src/charge-curve): samples as <data value="minute,kW,kWh"> children */
+      "charge-chart": HtmlProps & {
+        live?: boolean | undefined;
+        "min-minutes"?: number | undefined;
+        /** a D3 curve name from draw.ts (linear, monotone, step-after, …) */
+        curve?: string | undefined;
+        points?: boolean | undefined;
+        /** readings further apart (minutes) are joined by a dashed line */
+        "gap-minutes"?: number | undefined;
+        /** "solid": gaps between readings drawn like the rest of the line */
+        gaps?: "solid" | undefined;
+      };
       /** options from the server (htmx swaps the listbox) */
       "ds-combobox": HtmlProps;
       /** filters its own options in the browser; `filter` = where the query must match */

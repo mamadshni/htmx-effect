@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/main.tsx",
     "start": "tsx src/main.tsx",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "seed": "tsx src/charge-curve/db/seed.ts"
   },
   "dependencies": {
     "@combo/design-system": "workspace:*",
@@ -17,6 +18,7 @@
     "effect": "4.0.1",
     "esbuild": "^0.28.2",
     "htmx.org": "^2.0.11",
+    "linkedom": "0.18.12",
     "tsx-to-html": "^0.0.31"
   },
   "devDependencies": {
