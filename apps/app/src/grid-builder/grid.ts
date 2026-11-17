@@ -108,7 +108,8 @@ export const rectOf = (p: Placement): Rect | undefined => {
 const overlaps = (a: Rect, b: Rect) =>
   a.column < b.column + b.width && b.column < a.column + a.width && a.row < b.row + b.height && b.row < a.row + a.height;
 
-const collides = (p: Placement, others: Layout) => {
+/** whether a placement covers any of `others` (itself excluded) */
+export const collides = (p: Placement, others: Layout) => {
   const rect = rectOf(p);
   return rect !== undefined && others.some((o) => o.block !== p.block && overlaps(rect, rectOf(o)!));
 };
@@ -280,6 +281,28 @@ export const placeIn = (layouts: Layouts, view: View, id: string, cell: Cell): L
 export const resizeIn = (layouts: Layouts, view: View, id: string, width: number): LayoutsResult => {
   const result = resize(layouts[view], id, width, columnsOf(view));
   return result.ok ? { ok: true, layouts: withLayout(layouts, view, result.layout), message: result.message } : result;
+};
+
+/**
+ * Replace one layout as a whole (the result of a Tetris game, client/tetris.ts). The other
+ * layout keeps its places for the blocks still used, drops the others, and gets the new ones
+ * at its bottom, so both still have the same blocks.
+ */
+export const replaceIn = (layouts: Layouts, view: View, layout: Layout): LayoutsResult => {
+  const used = new Set(layout.map((p) => p.block));
+  const other = otherView(view);
+  let otherLayout: Layout = layouts[other].filter((p) => used.has(p.block));
+  for (const p of layout) {
+    if (placementOf(otherLayout, p.block)) continue;
+    const width = defaultWidth(blockById(p.block)!, columnsOf(other));
+    otherLayout = [...otherLayout, { block: p.block, width, column: 1, row: height(otherLayout) + 1 }];
+  }
+  const count = layout.length === 1 ? "1 block" : `${layout.length} blocks`;
+  return {
+    ok: true,
+    layouts: withLayout(withLayout(layouts, view, layout), other, otherLayout),
+    message: `The layout for ${viewLabel(view)} was replaced: ${count}.`,
+  };
 };
 
 /** back to the palette: out of both layouts */

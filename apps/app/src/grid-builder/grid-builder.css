@@ -38,9 +38,16 @@
 
 .grid-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+}
+
+.grid-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 /* cells and blocks are placed by number in the same tracks; the board grows by rows */
@@ -197,7 +204,16 @@
   margin-top: 0.5rem;
 }
 
+/*
+ * Code scrolls sideways inside its card. Cards are grids that size children to their content
+ * (justify-items: start), so the longest line would set the width and push past the card:
+ * stretch to the card instead, and keep the content from widening it (contain: inline-size).
+ */
 .grid-css {
+  justify-self: stretch;
+  contain: inline-size;
+  max-inline-size: 100%;
+  box-sizing: border-box;
   margin: 0.5rem 0 0;
   padding: 0.75rem;
   overflow-x: auto;
@@ -242,6 +258,8 @@
 }
 
 .grid-code-note {
+  /* long file paths wrap instead of widening the card */
+  overflow-wrap: anywhere;
   margin: 0.5rem 0 0;
   font-size: 0.85rem;
   color: #57606a;
@@ -312,4 +330,100 @@ body:has(#grid-view-narrow:checked) .grid-view-narrow {
 .grid-block.is-resizing {
   z-index: 10;
   cursor: ew-resize;
+}
+
+/* ---- Block Tetris: "Play Tetris" in the Layout toolbar (client/tetris.ts) ---- */
+
+.grid-tetris {
+  justify-items: stretch;
+}
+
+.grid-tetris:focus {
+  outline: none;
+}
+
+.grid-tetris__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1.5rem;
+}
+
+.grid-tetris__score,
+.grid-tetris__next,
+.grid-tetris__help {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.grid-tetris__score {
+  font-weight: 600;
+}
+
+.grid-tetris__help {
+  font-size: 0.9rem;
+  color: #57606a;
+}
+
+/* the well: the builder's board look, darker, a fixed depth */
+.grid-tetris__well {
+  max-inline-size: 48rem;
+  background: #1f2328;
+  border-color: #1f2328;
+}
+
+.grid-tetris__well .grid-cell {
+  border-color: rgb(255 255 255 / 0.08);
+}
+
+.grid-tetris__piece {
+  cursor: default;
+  color: #fff;
+  background: hsl(var(--hue) 65% 45%);
+  border-color: hsl(var(--hue) 70% 65%);
+  box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.15);
+}
+
+.grid-tetris__piece .grid-block__size {
+  color: rgb(255 255 255 / 0.75);
+}
+
+.grid-tetris__well .grid-preview {
+  background: rgb(255 255 255 / 0.08);
+  border: 2px dashed rgb(255 255 255 / 0.45);
+}
+
+@keyframes grid-tetris-flash {
+  from {
+    box-shadow: 0 0 0 4px #e3b341;
+  }
+}
+
+.grid-tetris__well.is-flash {
+  animation: grid-tetris-flash 0.6s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grid-tetris__well.is-flash {
+    animation: none;
+  }
+}
+
+.grid-tetris__end {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
+}
+
+.grid-tetris__end[hidden] {
+  display: none;
+}
+
+.grid-tetris__end-text {
+  margin: 0;
+  font-weight: 600;
+}
+
+.grid-tetris__end-text:focus {
+  outline: none;
 }

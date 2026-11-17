@@ -13,7 +13,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse, UrlParams } from "ef
 import { toHtml } from "tsx-to-html";
 import { document } from "../layout.js";
 import { type AppModule, fileRoute } from "../module.js";
-import { blockById, emptyLayouts, isView, type LayoutsResult, placeIn, removeFrom, resizeIn } from "./grid.js";
+import { blockById, columnsOf, emptyLayouts, isView, type LayoutsResult, parseLayout, placeIn, removeFrom, replaceIn, resizeIn } from "./grid.js";
 import { currentLayouts, deletePattern, MAX_NAME, patternById, savePattern, setLayouts } from "./store.js";
 import { assets, blockId, Changed, flowStylesPath, GridPage, loadId, nav, paletteId, PatternPage } from "./views.js";
 
@@ -62,6 +62,22 @@ const postResize = action((field) => {
   return commit(resizeIn(currentLayouts(), view, id, width), blockId(view, id));
 });
 
+/** view=<wide|narrow>, layout=<JSON placements>: one layout as a whole (the result of a Tetris game, client/tetris.ts) */
+const postReplace = action((field) => {
+  const view = field("view");
+  if (!isView(view)) return { message: "That layout is not valid." };
+  let value: unknown;
+  try {
+    value = JSON.parse(field("layout"));
+  } catch {
+    return { message: "That layout is not valid." };
+  }
+  // checked like a stored layout: unknown or repeated blocks dropped, everything inside, no overlaps
+  const layout = parseLayout(value, columnsOf(view));
+  const first = layout[0];
+  return commit(replaceIn(currentLayouts(), view, layout), first ? blockId(view, first.block) : "grid-clear");
+});
+
 /** block=<id>: back to the palette (out of both layouts) */
 const postRemove = action((field) => commit(removeFrom(currentLayouts(), field("block")), paletteId(field("block"))));
 
@@ -107,6 +123,7 @@ export const GridBuilderModule: AppModule = {
     HttpRouter.add("GET", nav.href, Effect.sync(() => document(<GridPage />))),
     HttpRouter.add("POST", "/grid/move", postMove),
     HttpRouter.add("POST", "/grid/resize", postResize),
+    HttpRouter.add("POST", "/grid/replace", postReplace),
     HttpRouter.add("POST", "/grid/remove", postRemove),
     HttpRouter.add("POST", "/grid/clear", postClear),
     HttpRouter.add("POST", "/grid/save", postSave),

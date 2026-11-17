@@ -125,8 +125,10 @@ h2 {
 
 .site-nav {
   display: flex;
+  /* narrow screens: the links go onto more lines instead of widening the page */
+  flex-wrap: wrap;
   align-items: center;
-  gap: 1.25rem;
+  gap: 0.5rem 1.25rem;
   max-width: 72rem;
   margin: 0 auto;
   padding: 0.75rem 1rem;
@@ -147,6 +149,7 @@ h2 {
 .site-nav a {
   color: var(--text);
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .site-nav a[aria-current="page"] {
