@@ -6,6 +6,7 @@ import { NodeHttpServer, NodeRuntime } from "@effect/platform-node";
 import { Layer } from "effect";
 import { HttpRouter, HttpServerResponse, HttpStaticServer } from "effect/http";
 import { CalendarModule } from "./calendar/routes.js";
+import { ChargeCurveModule } from "./charge-curve/routes.js";
 import { CompareModule } from "./compare/routes.js";
 import { ExportModule } from "./export/routes.js";
 import { FiltersModule } from "./filters/routes.js";
@@ -29,6 +30,7 @@ const modules: ReadonlyArray<AppModule> = [
   FiltersModule,
   ExportModule,
   GridBuilderModule,
+  ChargeCurveModule,
 ];
 
 /** what every page loads (see layout.tsx): htmx, the shared styles, the design system's bundle */

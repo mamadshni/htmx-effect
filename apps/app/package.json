@@ -13,12 +13,14 @@
     "@effect/platform-node": "4.0.1",
     "@js-temporal/polyfill": "^0.5.1",
     "cally": "^0.9.2",
+    "d3": "7.9.0",
     "effect": "4.0.1",
     "esbuild": "^0.28.2",
     "htmx.org": "^2.0.11",
     "tsx-to-html": "^0.0.31"
   },
   "devDependencies": {
+    "@types/d3": "7.4.3",
     "@types/node": "^24.0.0",
     "tsx": "^4.20.0",
     "typescript": "^6.0.3"

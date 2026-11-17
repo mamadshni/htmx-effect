@@ -1,0 +1,205 @@
+/* graph module styles, served at /assets/charge-curve/styles.css and linked by its pages. */
+
+charge-curve {
+  --curve-power: #5e9e5e;
+  --curve-energy: #2c3a9e;
+  --curve-band: #f4f5f7;
+  --curve-grid: #e3e6ea;
+  --curve-ink: #1f2328;
+  --curve-ink-muted: #59636e;
+  position: relative;
+  display: block;
+  inline-size: 100%;
+  min-inline-size: 0;
+}
+
+.curve-root {
+  position: relative;
+  border-radius: 6px;
+}
+
+.curve-root:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.curve-root svg {
+  display: block;
+  inline-size: 100%;
+  overflow: visible;
+  /* a horizontal drag moves the slider, a vertical one scrolls the page */
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.curve-axis text {
+  font: 12px system-ui, sans-serif;
+  fill: var(--curve-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.curve-axis-title {
+  font: 600 12px system-ui, sans-serif;
+  fill: var(--curve-ink-muted);
+}
+
+.curve-end-label {
+  font: 600 13px system-ui, sans-serif;
+  fill: var(--curve-ink);
+  font-variant-numeric: tabular-nums;
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.curve-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--curve-ink-muted);
+  list-style: none;
+}
+
+.curve-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.curve-legend__dot {
+  inline-size: 10px;
+  block-size: 10px;
+  background: var(--curve-power);
+  border-radius: 50%;
+}
+
+.curve-legend__line {
+  inline-size: 16px;
+  block-size: 2px;
+  background: var(--curve-energy);
+  border-radius: 1px;
+}
+
+.curve-tooltip {
+  position: absolute;
+  inset-block-start: 0;
+  z-index: 1;
+  display: grid;
+  gap: 0.15rem;
+  min-inline-size: 9rem;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.8rem;
+  color: var(--curve-ink);
+  font-variant-numeric: tabular-nums;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.1);
+  pointer-events: none;
+}
+
+.curve-tooltip__time {
+  font-weight: 600;
+}
+
+.curve-tooltip__row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.curve-tooltip__row strong {
+  margin-inline-start: auto;
+}
+
+.curve-placeholder {
+  display: grid;
+  place-items: center;
+  min-block-size: 12rem;
+  margin: 0;
+  color: var(--curve-ink-muted);
+  background: repeating-linear-gradient(135deg, transparent 0 10px, var(--curve-band) 10px 20px);
+  border: 1px dashed var(--curve-grid);
+  border-radius: 6px;
+}
+
+.curve-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  inline-size: 100%;
+}
+
+.curve-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.curve-status__note {
+  font-size: 0.85rem;
+  color: #59636e;
+}
+
+.curve-status__dot {
+  inline-size: 8px;
+  block-size: 8px;
+  background: #8c959f;
+  border-radius: 50%;
+}
+
+.curve-status__dot--live {
+  background: #2da44e;
+  animation: curve-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes curve-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .curve-status__dot--live {
+    animation: none;
+  }
+}
+
+.curve-table {
+  inline-size: 100%;
+}
+
+.curve-table summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.curve-number {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.curve-notes {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding-inline-start: 1.25rem;
+}
+
+@media (forced-colors: active) {
+  charge-curve {
+    --curve-power: CanvasText;
+    --curve-energy: Highlight;
+  }
+}
